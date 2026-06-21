@@ -41,30 +41,30 @@ class Card {
    *   As         → 15 poin
    */
   get points() {
-    if (this.isAce)     return 15;
+    if (this.isAce)      return 15;
     if (this.isFaceCard) return 10;
     return 5;
   }
 
-  get label() { return `${RANK_LABELS[this.rank]}${this.suit}`; }
+  get label()     { return `${RANK_LABELS[this.rank]}${this.suit}`; }
   get rankLabel() { return RANK_LABELS[this.rank]; }
-  get suitName() { return SUIT_NAMES[this.suit]; }
+  get suitName()  { return SUIT_NAMES[this.suit]; }
 
   toString() { return this.label; }
 }
 
 class Joker {
   constructor(id = 1) {
-    this.rank  = 0;
-    this.suit  = null;
-    this.id    = `JOKER_${id}`;
+    this.rank    = 0;
+    this.suit    = null;
+    this.id      = `JOKER_${id}`;
     this.isJoker = true;
     this.points  = 0; // poin joker dinamis, dihitung saat scoring
   }
   get isFaceCard()   { return false; }
   get isAce()        { return false; }
   get isNumberCard() { return false; }
-  toString()         { return '🃏'; }
+  toString()         { return 'JOKER'; }
 }
 
 module.exports = { Card, Joker, SUITS, RANKS, RANK_LABELS };
