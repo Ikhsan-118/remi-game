@@ -13,6 +13,8 @@
  *  ✓ Kembar As memerlukan dasar seri lebih dulu
  *  ✓ Joker sebagai wildcard dalam seri/kembar
  *  ✓ FIX: Joker gap logic yang lebih akurat (sliding window)
+ *  ✓ NEW: validateEat menerima `maxPositionFromTop` — batas kedalaman
+ *         pengambilan buangan (lihat aturan jumlah pemain di GameState.js)
  */
 
 const { Joker } = require('../models/Card');
@@ -296,17 +298,33 @@ function validateMeld(cards, hasBaseSeries = false) {
  *      Kartu yang dimakan + semua kartu di atasnya masuk ke tangan.
  *      Pemain wajib langsung meletakkan kombinasi yang menyertakan kartu yang dimakan.
  *  - Joker: tidak boleh untuk makan tengah.
+ *  - NEW — Batas Kedalaman Pengambilan (maxPositionFromTop):
+ *      Pada permainan dengan banyak pemain, jumlah kartu yang bisa "dilihat ke bawah"
+ *      dari tumpukan buangan dibatasi (lihat GameState._computeMaxEatDepth).
+ *      positionFromTop yang melebihi batas ini selalu ditolak, apa pun isi tangan pemain.
  *
- * @param {Card}    targetCard      — kartu yang ingin dimakan
- * @param {number}  positionFromTop — 0 = atas (rel), 1+ = tengah
- * @param {Card[]}  handCards       — kartu di tangan pemain saat ini
- * @param {boolean} hasBaseSeries   — sudah punya dasar seri?
+ * @param {Card}    targetCard          — kartu yang ingin dimakan
+ * @param {number}  positionFromTop     — 0 = atas (rel), 1+ = tengah
+ * @param {Card[]}  handCards           — kartu di tangan pemain saat ini
+ * @param {boolean} hasBaseSeries       — sudah punya dasar seri?
+ * @param {number}  maxPositionFromTop  — batas kedalaman pengambilan (default: tak terbatas)
  *
  * @returns {{ allowed: boolean, reason: string, requiredMeld: Card[]|null }}
  */
-function validateEat(targetCard, positionFromTop, handCards, hasBaseSeries) {
+function validateEat(targetCard, positionFromTop, handCards, hasBaseSeries, maxPositionFromTop = Infinity) {
   const isMidPile      = positionFromTop > 0;
   const targetIsJoker  = isJoker(targetCard);
+
+  // NEW: Batas kedalaman pengambilan buangan (berlaku untuk semua posisi,
+  // termasuk posisi teratas jika entah bagaimana batasnya 0 — namun secara
+  // praktik batas minimum yang masuk akal adalah 1).
+  if (positionFromTop >= maxPositionFromTop) {
+    return {
+      allowed: false,
+      reason: `Melebihi batas pengambilan buangan — hanya ${maxPositionFromTop} kartu teratas yang boleh diambil`,
+      requiredMeld: null
+    };
+  }
 
   // Joker tidak boleh untuk makan tengah
   if (targetIsJoker && isMidPile) {
