@@ -3,12 +3,15 @@
  * =====================================================
  * WebSocket server untuk Remi Indonesia multiplayer.
  *
- * PERBAIKAN:
+ * UPDATE v2:
  *  ✓ FIX: handleLeaveRoom sekarang broadcastLobby agar client update
  *  ✓ FIX: Pemain disconnect di lobby → reset ready + broadcastLobby
  *  ✓ FIX: handleStartGame memvalidasi semua pemain sudah ready
  *  ✓ FIX: broadcastGameState menyertakan nama pemain
  *  ✓ FIX: Pesan error lebih informatif
+ *  ✓ NEW: Voice Chat signaling (vc_signal) — relay WebRTC offer/answer/ICE
+ *  ✓ NEW: Snapshot publik menyertakan discardPileFull & discardCount
+ *  ✓ NEW: round_over menyertakan playerName di roundScores
  *
  * Protokol pesan (JSON):
  *   Client → Server:
@@ -22,6 +25,7 @@
  *     { type: 'discard',       cardId, attemptClose }
  *     { type: 'reconnect',     playerId, code }
  *     { type: 'leave_room' }
+ *     { type: 'vc_signal',     action, fromId, toId?, sdp?, candidate? }  ← NEW
  *
  *   Server → Client:
  *     { type: 'room_created',       code, playerId, room }
@@ -35,6 +39,7 @@
  *     { type: 'reconnected',        room, snapshot }
  *     { type: 'player_disconnected', playerId, playerName }
  *     { type: 'player_reconnected',  playerId, playerName }
+ *     { type: 'vc_signal',          action, fromId, toId?, sdp?, candidate? }  ← NEW
  */
 
 const WebSocket = require('ws');
@@ -45,7 +50,7 @@ const PORT        = process.env.PORT || 8080;
 const roomManager = new RoomManager();
 
 // Map: ws → { playerId, roomCode }
-const connMeta     = new Map();
+const connMeta      = new Map();
 // Map: playerId → ws
 const playerSockets = new Map();
 
@@ -76,10 +81,13 @@ function broadcastToRoom(room, payload, excludePlayerId = null) {
 /**
  * Kirim state_update (publik) ke semua pemain +
  * private_hand (kartu tangan) ke masing-masing pemain.
+ *
+ * UPDATE: snapshot publik sekarang menyertakan discardPileFull & discardCount.
  */
 function broadcastGameState(room) {
   if (!room.game) return;
-  const publicSnapshot = room.game.snapshot();
+
+  const publicSnapshot = room.game.snapshotPublic();  // Use extended snapshot
   broadcastToRoom(room, { type: 'state_update', snapshot: publicSnapshot });
 
   room.players.forEach(p => {
@@ -126,19 +134,16 @@ wss.on('connection', (ws) => {
       const playerName = room.playerNameOf(playerId);
 
       if (room.status === 'PLAYING' && room.game) {
-        // Game sedang berjalan → beri kesempatan reconnect 60 detik
         room.game.playerDisconnect(playerId);
         room.setConnected(playerId, false);
         broadcastToRoom(room, { type: 'player_disconnected', playerId, playerName });
         broadcastGameState(room);
         console.log(`Pemain ${playerName} (${playerId}) disconnect saat game berlangsung`);
       } else {
-        // Di lobby → hapus dari room, reset ready semua, broadcast update
-        // FIX: removePlayer sekarang juga reset ready semua pemain tersisa
         room.removePlayer(playerId);
         roomManager.removeRoomIfEmpty(roomCode);
         if (roomManager.getRoom(roomCode)) {
-          broadcastLobby(room);  // FIX: broadcast agar client tahu ada yang keluar
+          broadcastLobby(room);
         }
         console.log(`Pemain ${playerName} keluar dari lobby ${roomCode}`);
       }
@@ -168,7 +173,8 @@ function handleMessage(ws, msg) {
     place_meld:   handlePlaceMeld,
     discard:      handleDiscard,
     reconnect:    handleReconnect,
-    leave_room:   handleLeaveRoom
+    leave_room:   handleLeaveRoom,
+    vc_signal:    handleVcSignal      // NEW: Voice Chat signaling
   };
 
   const handler = handlers[msg.type];
@@ -227,7 +233,6 @@ function handleJoinRoom(ws, msg) {
   playerSockets.set(playerId, ws);
 
   send(ws, { type: 'room_joined', code: room.code, playerId, room: room.toLobbySummary() });
-  // FIX: Broadcast lobby_update ke semua (termasuk host) agar mereka tahu ada yang join
   broadcastLobby(room);
   console.log(`${playerName} bergabung ke room ${room.code}`);
 }
@@ -255,15 +260,12 @@ function handleStartGame(ws, msg) {
     return send(ws, { type: 'error', message: 'Hanya host yang bisa memulai permainan' });
   }
 
-  // FIX: startGame() sekarang validasi canStart (semua ready + min pemain)
   const result = room.startGame();
   if (!result.success) {
     return send(ws, { type: 'error', message: result.reason });
   }
 
-  // Broadcast ke semua pemain bahwa game dimulai
   broadcastToRoom(room, { type: 'game_started', snapshot: result.snapshot });
-  // Kirim state + kartu tangan masing-masing
   broadcastGameState(room);
   console.log(`Game dimulai di room ${room.code}, giliran pertama: ${result.snapshot.currentTurnName}`);
 }
@@ -276,7 +278,6 @@ function handleLeaveRoom(ws, msg) {
   if (room) {
     const playerName = room.playerNameOf(meta.playerId);
     room.removePlayer(meta.playerId);
-    // FIX: Broadcast lobby update agar semua tahu ada yang keluar + ready direset
     roomManager.removeRoomIfEmpty(meta.roomCode);
     if (roomManager.getRoom(meta.roomCode)) {
       broadcastLobby(room);
@@ -363,12 +364,18 @@ function handleDiscard(ws, msg) {
 }
 
 function _handleRoundOver(room, result) {
+  // Enrich roundScores with playerName from room
+  const enrichedScores = (result.roundScores || []).map(rs => ({
+    ...rs,
+    playerName: room.playerNameOf(rs.playerId)
+  }));
+
   broadcastToRoom(room, {
     type:        'round_over',
     winner:      result.winner,
     winnerName:  result.winnerName,
     stockEmpty:  result.stockEmpty,
-    roundScores: result.roundScores,
+    roundScores: enrichedScores,
     totalScores: result.totalScores
   });
   broadcastGameState(room);
@@ -413,12 +420,47 @@ function handleReconnect(ws, msg) {
 
   broadcastToRoom(room, { type: 'player_reconnected', playerId: msg.playerId, playerName }, msg.playerId);
 
-  // Jika game sedang berjalan, kirim state terkini ke pemain yang reconnect
   if (room.game) {
     broadcastGameState(room);
   }
 
   console.log(`Pemain ${playerName} berhasil reconnect ke room ${room.code}`);
+}
+
+// ─────────────────────────────────────────────────────
+// Handler: Voice Chat Signaling  ← NEW
+// ─────────────────────────────────────────────────────
+
+/**
+ * Relay WebRTC signaling messages within the same room.
+ * The server never inspects the SDP/ICE content — it just routes them.
+ *
+ * If msg.toId is specified, relay to that player only.
+ * If msg.toId is omitted (e.g. vc_joined / vc_left), broadcast to room.
+ */
+function handleVcSignal(ws, msg) {
+  const meta = connMeta.get(ws);
+  if (!meta) return;
+
+  const room = roomManager.getRoom(meta.roomCode);
+  if (!room) return;
+
+  const payload = {
+    type:      'vc_signal',
+    action:    msg.action,
+    fromId:    meta.playerId,           // always use server-verified ID
+    toId:      msg.toId   || null,
+    sdp:       msg.sdp    || null,
+    candidate: msg.candidate || null
+  };
+
+  if (msg.toId) {
+    // Unicast — send only to target player
+    sendToPlayer(msg.toId, payload);
+  } else {
+    // Broadcast to room except sender
+    broadcastToRoom(room, payload, meta.playerId);
+  }
 }
 
 // ─────────────────────────────────────────────────────
