@@ -6,7 +6,9 @@
  * bisa reconnect otomatis jika koneksi putus / refresh.
  *
  * PERBAIKAN:
- *  ✓ FIX: PRODUCTION_SERVER_URL — tambahkan // setelah wss: (bug typo)
+ *  ✓ FIX: PRODUCTION_SERVER_URL — tambahkan // setelah wss: (bug typo
+ *    sebelumnya ditulis 'wss:remi-game...' tanpa // sehingga WebSocket
+ *    gagal connect di production / Netlify)
  *  ✓ FIX: Reconnect hanya dilakukan jika ada sesi tersimpan yang valid
  */
 
@@ -14,7 +16,7 @@ const RemiClient = (() => {
   // ── GANTI dengan domain server kamu setelah deploy ke Railway/Render ──
   // FIX: Pastikan format wss:// (dua slash), contoh:
   // 'wss://remi-game.up.railway.app'
-  const PRODUCTION_SERVER_URL = 'wss:remi-game.up.railway.app';
+  const PRODUCTION_SERVER_URL = 'wss://remi-game.up.railway.app';
 
   const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const SERVER_URL  = isLocalhost
