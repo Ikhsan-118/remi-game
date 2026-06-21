@@ -3,6 +3,13 @@
  * =====================================================
  * WebSocket server untuk Remi Indonesia multiplayer.
  *
+ * PERBAIKAN:
+ *  ✓ FIX: handleLeaveRoom sekarang broadcastLobby agar client update
+ *  ✓ FIX: Pemain disconnect di lobby → reset ready + broadcastLobby
+ *  ✓ FIX: handleStartGame memvalidasi semua pemain sudah ready
+ *  ✓ FIX: broadcastGameState menyertakan nama pemain
+ *  ✓ FIX: Pesan error lebih informatif
+ *
  * Protokol pesan (JSON):
  *   Client → Server:
  *     { type: 'create_room',   name, options }
@@ -17,27 +24,29 @@
  *     { type: 'leave_room' }
  *
  *   Server → Client:
- *     { type: 'room_created',  code, playerId }
- *     { type: 'lobby_update',  room }
- *     { type: 'game_started',  snapshot }
- *     { type: 'state_update',  snapshot }          (broadcast ke semua)
- *     { type: 'private_hand',  hand, melds }        (hanya ke pemain ybs)
- *     { type: 'round_over',    roundScores, totalScores, winner }
- *     { type: 'error',         message }
- *     { type: 'player_disconnected', playerId }
- *     { type: 'player_reconnected',  playerId }
+ *     { type: 'room_created',       code, playerId, room }
+ *     { type: 'room_joined',        code, playerId, room }
+ *     { type: 'lobby_update',       room }
+ *     { type: 'game_started',       snapshot }
+ *     { type: 'state_update',       snapshot }
+ *     { type: 'private_hand',       hand, melds, hasBaseSeries }
+ *     { type: 'round_over',         roundScores, totalScores, winner, winnerName }
+ *     { type: 'error',              message }
+ *     { type: 'reconnected',        room, snapshot }
+ *     { type: 'player_disconnected', playerId, playerName }
+ *     { type: 'player_reconnected',  playerId, playerName }
  */
 
 const WebSocket = require('ws');
-const crypto = require('crypto');
+const crypto    = require('crypto');
 const { RoomManager } = require('./RoomManager');
 
-const PORT = process.env.PORT || 8080;
+const PORT        = process.env.PORT || 8080;
 const roomManager = new RoomManager();
 
-// Map: ws connection → { playerId, roomCode }
-const connMeta = new Map();
-// Map: playerId → ws connection (untuk push langsung / reconnect)
+// Map: ws → { playerId, roomCode }
+const connMeta     = new Map();
+// Map: playerId → ws
 const playerSockets = new Map();
 
 const wss = new WebSocket.Server({ port: PORT });
@@ -64,7 +73,10 @@ function broadcastToRoom(room, payload, excludePlayerId = null) {
   });
 }
 
-/** Kirim state_update (publik) ke semua + private_hand (kartu tangan) ke masing2 pemain */
+/**
+ * Kirim state_update (publik) ke semua pemain +
+ * private_hand (kartu tangan) ke masing-masing pemain.
+ */
 function broadcastGameState(room) {
   if (!room.game) return;
   const publicSnapshot = room.game.snapshot();
@@ -74,9 +86,9 @@ function broadcastGameState(room) {
     const playerState = room.game.players.find(gp => gp.id === p.id);
     if (!playerState) return;
     sendToPlayer(p.id, {
-      type: 'private_hand',
-      hand:  playerState.hand.map(c => c.toString()),
-      melds: playerState.melds.map(m => m.map(c => c.toString())),
+      type:          'private_hand',
+      hand:          playerState.hand.map(c => c.toString()),
+      melds:         playerState.melds.map(m => m.map(c => c.toString())),
       hasBaseSeries: playerState.hasBaseSeries
     });
   });
@@ -91,7 +103,7 @@ function broadcastLobby(room) {
 // ─────────────────────────────────────────────────────
 
 wss.on('connection', (ws) => {
-  console.log('Koneksi baru masuk');
+  console.log('Koneksi WebSocket baru masuk');
 
   ws.on('message', (raw) => {
     let msg;
@@ -106,26 +118,38 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     const meta = connMeta.get(ws);
     if (!meta) return;
+
     const { playerId, roomCode } = meta;
     const room = roomManager.getRoom(roomCode);
 
     if (room) {
+      const playerName = room.playerNameOf(playerId);
+
       if (room.status === 'PLAYING' && room.game) {
-        // Berikan kesempatan reconnect 60 detik (sesuai aturan)
+        // Game sedang berjalan → beri kesempatan reconnect 60 detik
         room.game.playerDisconnect(playerId);
         room.setConnected(playerId, false);
-        broadcastToRoom(room, { type: 'player_disconnected', playerId });
+        broadcastToRoom(room, { type: 'player_disconnected', playerId, playerName });
         broadcastGameState(room);
+        console.log(`Pemain ${playerName} (${playerId}) disconnect saat game berlangsung`);
       } else {
-        // Masih di lobby → langsung keluar dari room
+        // Di lobby → hapus dari room, reset ready semua, broadcast update
+        // FIX: removePlayer sekarang juga reset ready semua pemain tersisa
         room.removePlayer(playerId);
         roomManager.removeRoomIfEmpty(roomCode);
-        if (roomManager.rooms.has(roomCode)) broadcastLobby(room);
+        if (roomManager.getRoom(roomCode)) {
+          broadcastLobby(room);  // FIX: broadcast agar client tahu ada yang keluar
+        }
+        console.log(`Pemain ${playerName} keluar dari lobby ${roomCode}`);
       }
     }
+
     connMeta.delete(ws);
     playerSockets.delete(playerId);
-    console.log(`Pemain ${playerId} terputus`);
+  });
+
+  ws.on('error', (err) => {
+    console.error('WebSocket error:', err.message);
   });
 });
 
@@ -135,16 +159,16 @@ wss.on('connection', (ws) => {
 
 function handleMessage(ws, msg) {
   const handlers = {
-    create_room:   handleCreateRoom,
-    join_room:     handleJoinRoom,
-    set_ready:     handleSetReady,
-    start_game:    handleStartGame,
-    draw_stock:    handleDrawStock,
-    draw_discard:  handleDrawDiscard,
-    place_meld:    handlePlaceMeld,
-    discard:       handleDiscard,
-    reconnect:     handleReconnect,
-    leave_room:    handleLeaveRoom,
+    create_room:  handleCreateRoom,
+    join_room:    handleJoinRoom,
+    set_ready:    handleSetReady,
+    start_game:   handleStartGame,
+    draw_stock:   handleDrawStock,
+    draw_discard: handleDrawDiscard,
+    place_meld:   handlePlaceMeld,
+    discard:      handleDiscard,
+    reconnect:    handleReconnect,
+    leave_room:   handleLeaveRoom
   };
 
   const handler = handlers[msg.type];
@@ -164,8 +188,12 @@ function handleMessage(ws, msg) {
 // ─────────────────────────────────────────────────────
 
 function handleCreateRoom(ws, msg) {
-  const playerId = crypto.randomUUID();
+  const playerId   = crypto.randomUUID();
   const playerName = (msg.name || 'Pemain').trim().slice(0, 20);
+
+  if (!playerName) {
+    return send(ws, { type: 'error', message: 'Nama pemain tidak boleh kosong' });
+  }
 
   const room = roomManager.createRoom(playerId, playerName, msg.options || {});
 
@@ -177,10 +205,19 @@ function handleCreateRoom(ws, msg) {
 }
 
 function handleJoinRoom(ws, msg) {
-  const playerId = crypto.randomUUID();
+  const playerId   = crypto.randomUUID();
   const playerName = (msg.name || 'Pemain').trim().slice(0, 20);
 
-  const result = roomManager.joinRoom(msg.code, playerId, playerName);
+  if (!playerName) {
+    return send(ws, { type: 'error', message: 'Nama pemain tidak boleh kosong' });
+  }
+
+  const code = (msg.code || '').toUpperCase().trim();
+  if (!code) {
+    return send(ws, { type: 'error', message: 'Kode ruang tidak boleh kosong' });
+  }
+
+  const result = roomManager.joinRoom(code, playerId, playerName);
   if (!result.success) {
     return send(ws, { type: 'error', message: result.reason });
   }
@@ -190,15 +227,18 @@ function handleJoinRoom(ws, msg) {
   playerSockets.set(playerId, ws);
 
   send(ws, { type: 'room_joined', code: room.code, playerId, room: room.toLobbySummary() });
+  // FIX: Broadcast lobby_update ke semua (termasuk host) agar mereka tahu ada yang join
   broadcastLobby(room);
   console.log(`${playerName} bergabung ke room ${room.code}`);
 }
 
 function handleSetReady(ws, msg) {
   const meta = connMeta.get(ws);
-  if (!meta) return;
+  if (!meta) return send(ws, { type: 'error', message: 'Sesi tidak valid, sambungkan ulang' });
+
   const room = roomManager.getRoom(meta.roomCode);
-  if (!room) return;
+  if (!room) return send(ws, { type: 'error', message: 'Ruang tidak ditemukan' });
+  if (room.status !== 'LOBBY') return send(ws, { type: 'error', message: 'Game sudah dimulai' });
 
   room.setReady(meta.playerId, !!msg.ready);
   broadcastLobby(room);
@@ -206,7 +246,8 @@ function handleSetReady(ws, msg) {
 
 function handleStartGame(ws, msg) {
   const meta = connMeta.get(ws);
-  if (!meta) return;
+  if (!meta) return send(ws, { type: 'error', message: 'Sesi tidak valid' });
+
   const room = roomManager.getRoom(meta.roomCode);
   if (!room) return send(ws, { type: 'error', message: 'Ruang tidak ditemukan' });
 
@@ -214,25 +255,35 @@ function handleStartGame(ws, msg) {
     return send(ws, { type: 'error', message: 'Hanya host yang bisa memulai permainan' });
   }
 
+  // FIX: startGame() sekarang validasi canStart (semua ready + min pemain)
   const result = room.startGame();
   if (!result.success) {
     return send(ws, { type: 'error', message: result.reason });
   }
 
+  // Broadcast ke semua pemain bahwa game dimulai
   broadcastToRoom(room, { type: 'game_started', snapshot: result.snapshot });
+  // Kirim state + kartu tangan masing-masing
   broadcastGameState(room);
-  console.log(`Game dimulai di room ${room.code}`);
+  console.log(`Game dimulai di room ${room.code}, giliran pertama: ${result.snapshot.currentTurnName}`);
 }
 
 function handleLeaveRoom(ws, msg) {
   const meta = connMeta.get(ws);
   if (!meta) return;
+
   const room = roomManager.getRoom(meta.roomCode);
   if (room) {
+    const playerName = room.playerNameOf(meta.playerId);
     room.removePlayer(meta.playerId);
+    // FIX: Broadcast lobby update agar semua tahu ada yang keluar + ready direset
     roomManager.removeRoomIfEmpty(meta.roomCode);
-    if (roomManager.rooms.has(meta.roomCode)) broadcastLobby(room);
+    if (roomManager.getRoom(meta.roomCode)) {
+      broadcastLobby(room);
+    }
+    console.log(`${playerName} meninggalkan room ${meta.roomCode}`);
   }
+
   connMeta.delete(ws);
   playerSockets.delete(meta.playerId);
 }
@@ -256,7 +307,6 @@ function handleDrawStock(ws, msg) {
   const result = ctx.game.drawFromStock(ctx.meta.playerId);
   if (!result.success) return send(ws, { type: 'error', message: result.reason });
 
-  // Cek apakah ini memicu game over (stock habis)
   if (result.gameOver) {
     return _handleRoundOver(ctx.room, result);
   }
@@ -268,9 +318,11 @@ function handleDrawDiscard(ws, msg) {
   const ctx = _getActiveGame(ws);
   if (!ctx) return send(ws, { type: 'error', message: 'Tidak ada permainan aktif' });
 
+  const positionFromTop = typeof msg.positionFromTop === 'number' ? msg.positionFromTop : 0;
+
   const result = ctx.game.drawFromDiscard(
     ctx.meta.playerId,
-    msg.positionFromTop ?? 0,
+    positionFromTop,
     msg.intendedMeld || null
   );
   if (!result.success) return send(ws, { type: 'error', message: result.reason });
@@ -282,7 +334,11 @@ function handlePlaceMeld(ws, msg) {
   const ctx = _getActiveGame(ws);
   if (!ctx) return send(ws, { type: 'error', message: 'Tidak ada permainan aktif' });
 
-  const result = ctx.game.placeMeld(ctx.meta.playerId, msg.cardIds || []);
+  if (!Array.isArray(msg.cardIds) || msg.cardIds.length < 3) {
+    return send(ws, { type: 'error', message: 'Minimal 3 kartu untuk membentuk kombinasi' });
+  }
+
+  const result = ctx.game.placeMeld(ctx.meta.playerId, msg.cardIds);
   if (!result.success) return send(ws, { type: 'error', message: result.reason });
 
   broadcastGameState(ctx.room);
@@ -291,6 +347,10 @@ function handlePlaceMeld(ws, msg) {
 function handleDiscard(ws, msg) {
   const ctx = _getActiveGame(ws);
   if (!ctx) return send(ws, { type: 'error', message: 'Tidak ada permainan aktif' });
+
+  if (!msg.cardId) {
+    return send(ws, { type: 'error', message: 'Pilih kartu yang ingin dibuang' });
+  }
 
   const result = ctx.game.discard(ctx.meta.playerId, msg.cardId, !!msg.attemptClose);
   if (!result.success) return send(ws, { type: 'error', message: result.reason });
@@ -304,14 +364,15 @@ function handleDiscard(ws, msg) {
 
 function _handleRoundOver(room, result) {
   broadcastToRoom(room, {
-    type: 'round_over',
-    winner: result.winner,
-    stockEmpty: result.stockEmpty,
+    type:        'round_over',
+    winner:      result.winner,
+    winnerName:  result.winnerName,
+    stockEmpty:  result.stockEmpty,
     roundScores: result.roundScores,
     totalScores: result.totalScores
   });
   broadcastGameState(room);
-  console.log(`Putaran selesai di room ${room.code}. Pemenang: ${result.winner || '(stock habis)'}`);
+  console.log(`Putaran selesai di room ${room.code}. Pemenang: ${result.winnerName || '(stock habis)'}`);
 }
 
 // ─────────────────────────────────────────────────────
@@ -319,6 +380,10 @@ function _handleRoundOver(room, result) {
 // ─────────────────────────────────────────────────────
 
 function handleReconnect(ws, msg) {
+  if (!msg.playerId || !msg.code) {
+    return send(ws, { type: 'error', message: 'playerId dan code diperlukan untuk reconnect' });
+  }
+
   const room = roomManager.getRoom(msg.code);
   if (!room) return send(ws, { type: 'error', message: 'Ruang tidak ditemukan' });
 
@@ -338,13 +403,22 @@ function handleReconnect(ws, msg) {
   connMeta.set(ws, { playerId: msg.playerId, roomCode: room.code });
   playerSockets.set(msg.playerId, ws);
 
+  const playerName = room.playerNameOf(msg.playerId);
+
   send(ws, {
-    type: 'reconnected',
-    room: room.toLobbySummary(),
+    type:     'reconnected',
+    room:     room.toLobbySummary(),
     snapshot: room.game ? room.game.snapshotForPlayer(msg.playerId) : null
   });
-  broadcastToRoom(room, { type: 'player_reconnected', playerId: msg.playerId }, msg.playerId);
-  console.log(`Pemain ${msg.playerId} berhasil reconnect ke room ${room.code}`);
+
+  broadcastToRoom(room, { type: 'player_reconnected', playerId: msg.playerId, playerName }, msg.playerId);
+
+  // Jika game sedang berjalan, kirim state terkini ke pemain yang reconnect
+  if (room.game) {
+    broadcastGameState(room);
+  }
+
+  console.log(`Pemain ${playerName} berhasil reconnect ke room ${room.code}`);
 }
 
 // ─────────────────────────────────────────────────────
