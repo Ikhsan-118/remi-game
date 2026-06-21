@@ -6,793 +6,319 @@
 <title>Remi — Meja Permainan</title>
 <style>
   :root {
-    --felt-dark:    #0D3B2E;
-    --felt-light:   #144A38;
-    --felt-edge:    #0A2B21;
-    --gold:         #D4AF37;
-    --gold-dim:     #8A7530;
-    --cream:        #F2E9D8;
-    --cream-dim:    #C9BEA6;
-    --card-red:     #C23B3B;
-    --card-black:   #1A1A1A;
-    --card-face:    #FBF8F0;
-    --panel-bg:     rgba(10, 30, 24, 0.92);
-    --shadow-deep:  rgba(0, 0, 0, 0.55);
-    --green-ready:  #4ade80;
-    --blue-vc:      #3B82F6;
-    --blue-vc-dim:  #1D4ED8;
-    --font-display: 'Source Serif Pro', Georgia, serif;
-    --font-mono:    'JetBrains Mono', 'Courier New', monospace;
+    --felt-dark:   #0D3B2E;
+    --felt-mid:    #144A38;
+    --felt-edge:   #0A2B21;
+    --gold:        #D4AF37;
+    --gold-dim:    #8A7530;
+    --cream:       #F2E9D8;
+    --cream-dim:   #C9BEA6;
+    --red:         #C23B3B;
+    --black-card:  #1A1A1A;
+    --card-face:   #FFFEF8;
+    --card-back1:  #1a3a6b;
+    --card-back2:  #0d2347;
+    --panel:       rgba(8,26,20,0.94);
+    --shadow:      rgba(0,0,0,0.6);
+    --green:       #4ade80;
+    --blue:        #3B82F6;
+    --amber:       #F59E0B;
+    --font-d:      'Georgia', serif;
+    --font-m:      'Courier New', monospace;
   }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:var(--font-m);
+    background:radial-gradient(ellipse at 40% 40%,var(--felt-mid) 0%,var(--felt-dark) 55%,var(--felt-edge) 100%);
+    color:var(--cream);min-height:100vh;overflow-x:hidden;
+    user-select:none;-webkit-tap-highlight-color:transparent;
+  }
+  body::before{content:'';position:fixed;inset:0;
+    background:radial-gradient(circle at 20% 25%,rgba(255,255,255,.03) 0%,transparent 50%);
+    pointer-events:none;z-index:0}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:10px 10px 0;min-height:100vh;display:flex;flex-direction:column}
 
-  body {
-    font-family: var(--font-mono);
-    background: radial-gradient(ellipse at center, var(--felt-light) 0%, var(--felt-dark) 55%, var(--felt-edge) 100%);
-    color: var(--cream);
-    min-height: 100vh;
-    overflow-x: hidden;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-  }
+  /* ── TOPBAR ── */
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;
+    background:var(--panel);border:1px solid var(--gold-dim);border-radius:10px;margin-bottom:10px;gap:10px}
+  .room-lbl{font-size:9px;letter-spacing:.1em;color:var(--cream-dim);text-transform:uppercase}
+  .room-code{font-family:var(--font-d);font-size:20px;color:var(--gold);letter-spacing:.08em}
+  .turn-pill{flex:1;text-align:center;font-family:var(--font-d);font-size:13px;
+    padding:5px 12px;border-radius:20px;border:1px solid var(--gold-dim);
+    background:rgba(212,175,55,.06);transition:all .3s}
+  .turn-pill.mine{background:rgba(212,175,55,.22);border-color:var(--gold);color:var(--gold);box-shadow:0 0 14px rgba(212,175,55,.25)}
+  .phase-badge{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--cream-dim)}
+  .phase-badge span{color:var(--gold);display:block;font-size:12px;margin-top:2px}
+  .btn-icon{background:none;border:1px solid var(--gold-dim);color:var(--cream-dim);
+    padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-family:var(--font-m);
+    letter-spacing:.04em;transition:all .2s}
+  .btn-icon:hover{border-color:var(--gold);color:var(--gold)}
 
-  body::before {
-    content: '';
-    position: fixed; inset: 0;
-    background-image:
-      radial-gradient(circle at 20% 30%, rgba(255,255,255,0.025) 0%, transparent 40%),
-      radial-gradient(circle at 80% 70%, rgba(255,255,255,0.02) 0%, transparent 40%);
-    pointer-events: none;
-    z-index: 0;
-  }
+  /* ── OPPONENTS ── */
+  .opponents{display:flex;justify-content:center;gap:22px;padding:8px 0 14px;flex-wrap:wrap}
+  .opp{display:flex;flex-direction:column;align-items:center;gap:5px;opacity:.72;transition:all .25s}
+  .opp.active{opacity:1;transform:translateY(-3px)}
+  .opp-av{width:42px;height:42px;border-radius:50%;
+    background:linear-gradient(135deg,var(--felt-mid),var(--felt-edge));
+    border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-d);font-size:16px;color:var(--gold)}
+  .opp.active .opp-av{border-color:var(--gold);box-shadow:0 0 10px rgba(212,175,55,.4)}
+  .opp-name{font-size:10px;color:var(--cream-dim);max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+  .opp.active .opp-name{color:var(--cream)}
+  .opp-cards{display:flex}
+  .mini-c{width:11px;height:16px;background:linear-gradient(135deg,var(--card-back1),var(--card-back2));
+    border:1px solid rgba(255,255,255,.2);border-radius:2px;margin-left:-4px}
+  .mini-c:first-child{margin-left:0}
+  .opp-count{font-size:9px;color:var(--cream-dim)}
 
-  .table-wrap {
-    position: relative;
-    z-index: 1;
-    max-width: 980px;
-    margin: 0 auto;
-    padding: 14px 14px 0;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+  /* ── CENTER ── */
+  .center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:8px 0 16px}
+  .stock-warn{font-size:10px;color:var(--amber);padding:4px 12px;
+    border-radius:6px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);display:none}
+  .stock-warn.show{display:block}
+  .piles-row{display:flex;align-items:center;gap:44px}
+  .pile-block{display:flex;flex-direction:column;align-items:center;gap:7px}
+  .pile-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--cream-dim)}
 
-  /* ───────── TOP BAR ───────── */
-  .topbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 16px;
-    background: var(--panel-bg);
-    border: 1px solid var(--gold-dim);
-    border-radius: 10px;
-    margin-bottom: 12px;
-    gap: 12px;
+  /* ── REAL CARD SVG RENDERER ── */
+  /* Playing card: 58×82px for hand, 46×66px small */
+  .pcard{
+    width:58px;height:82px;border-radius:6px;
+    background:var(--card-face);
+    border:1px solid rgba(0,0,0,.12);
+    box-shadow:0 2px 6px var(--shadow);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:hidden;flex-shrink:0;
+    font-family:var(--font-d);font-weight:700;
   }
-  .room-info { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
-  .room-info .label { font-size: 10px; letter-spacing: 0.12em; color: var(--cream-dim); text-transform: uppercase; }
-  .room-info .code  { font-family: var(--font-display); font-size: 18px; color: var(--gold); letter-spacing: 0.06em; }
+  .pcard.red { color:var(--red); }
+  .pcard.black { color:var(--black-card); }
+  /* corner labels */
+  .pcard .c-tl{position:absolute;top:3px;left:4px;display:flex;flex-direction:column;align-items:center;line-height:1}
+  .pcard .c-br{position:absolute;bottom:3px;right:4px;display:flex;flex-direction:column;align-items:center;line-height:1;transform:rotate(180deg)}
+  .pcard .c-rank{font-size:13px;font-weight:800}
+  .pcard .c-suit{font-size:11px;margin-top:-1px}
+  /* center pip */
+  .pcard .c-ctr{font-size:22px;line-height:1}
+  /* face card art */
+  .pcard .c-face{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px}
+  /* joker */
+  .pcard.joker{
+    background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
+    color:var(--gold);border-color:var(--gold-dim);
+  }
+  .pcard.joker .c-joker{font-size:28px;text-align:center;line-height:1}
+  /* card back */
+  .pcard.back{
+    background:linear-gradient(135deg,var(--card-back1) 0%,var(--card-back2) 100%);
+    border-color:rgba(255,255,255,.15);
+  }
+  .pcard.back::after{
+    content:'◆';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    color:rgba(255,255,255,.15);font-size:24px;
+  }
+  /* small variant */
+  .pcard-sm{width:46px;height:66px;border-radius:5px}
+  .pcard-sm .c-rank{font-size:11px}
+  .pcard-sm .c-suit{font-size:9px}
+  .pcard-sm .c-ctr{font-size:17px}
+  .pcard-sm .c-face{font-size:20px}
+  .pcard-sm .c-joker{font-size:20px}
 
-  .turn-indicator {
-    font-family: var(--font-display);
-    font-size: 14px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    border: 1px solid var(--gold-dim);
-    background: rgba(212,175,55,0.06);
-    color: var(--cream);
-    transition: all 0.3s ease;
-    text-align: center;
-    flex: 1;
-  }
-  .turn-indicator.my-turn {
-    background: rgba(212,175,55,0.22);
-    border-color: var(--gold);
-    color: var(--gold);
-    box-shadow: 0 0 16px rgba(212,175,55,0.25);
-  }
+  /* ── STOCK PILE VISUAL ── */
+  .stock-pile-wrap{position:relative;width:58px;height:82px;cursor:pointer;transition:transform .15s}
+  .stock-pile-wrap:hover:not(.disabled){transform:translateY(-2px)}
+  .stock-pile-wrap.disabled{cursor:not-allowed;opacity:.42}
+  .stock-shadow{position:absolute;width:58px;height:82px;border-radius:6px;background:linear-gradient(135deg,#1a1a2e,#0d2347);border:1px solid rgba(255,255,255,.15)}
+  .stock-shadow:nth-child(1){transform:translate(3px,3px);opacity:.4}
+  .stock-shadow:nth-child(2){transform:translate(2px,2px);opacity:.6}
+  .stock-shadow:nth-child(3){transform:translate(1px,1px);opacity:.8}
+  .stock-top{position:absolute;width:58px;height:82px}
+  .stock-count{font-family:var(--font-d);font-size:12px;color:var(--gold)}
 
-  .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  /* ── DISCARD PILE ── */
+  .discard-pile-wrap{position:relative;width:110px;height:82px;cursor:pointer}
+  .discard-pile-wrap .dcard{position:absolute}
+  .discard-pile-wrap .dcard:nth-last-child(1){left:26px;top:0;z-index:3}
+  .discard-pile-wrap .dcard:nth-last-child(2){left:13px;top:2px;z-index:2;opacity:.85}
+  .discard-pile-wrap .dcard:nth-last-child(3){left:0;top:4px;z-index:1;opacity:.65}
+  .discard-pile-wrap:hover .dcard:nth-last-child(1){transform:translateY(-4px)}
+  .discard-count{position:absolute;top:-8px;right:-8px;
+    background:var(--gold);color:#1a1a1a;font-size:9px;font-weight:700;
+    width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:10}
+  .empty-pile{width:58px;height:82px;border:1px dashed var(--gold-dim);border-radius:6px;opacity:.35}
 
-  .phase-tag {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--cream-dim);
-    text-align: right;
-  }
-  .phase-tag .phase-name { color: var(--gold); display: block; font-size: 13px; margin-top: 2px; }
+  /* ── MY ZONE ── */
+  .my-zone{background:var(--panel);border-top:1px solid var(--gold-dim);padding:12px 10px 16px;display:flex;flex-direction:column;gap:8px}
+  .my-melds{display:flex;gap:12px;flex-wrap:wrap;min-height:0;padding:0 2px}
+  .meld-group{display:flex;padding:3px;border-radius:5px;background:rgba(212,175,55,.05);border:1px dashed var(--gold-dim)}
+  .meld-group .pcard{width:38px;height:54px;margin-left:-10px}
+  .meld-group .pcard:first-child{margin-left:0}
+  .meld-group .pcard .c-rank{font-size:10px}
+  .meld-group .pcard .c-suit{font-size:8px}
+  .meld-group .pcard .c-ctr{font-size:14px}
+  .meld-group .pcard .c-face{font-size:16px}
 
-  /* ───────── VOICE CHAT PANEL ───────── */
-  .vc-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 8px;
-    border: 1px solid var(--gold-dim);
-    background: rgba(59,130,246,0.08);
-    transition: all 0.2s ease;
-    position: relative;
-    min-width: 42px;
-  }
-  .vc-panel:hover { border-color: var(--blue-vc); background: rgba(59,130,246,0.15); }
-  .vc-panel.vc-active { border-color: var(--green-ready); background: rgba(74,222,128,0.1); }
-  .vc-panel.vc-muted  { border-color: var(--card-red); background: rgba(194,59,59,0.1); }
-  .vc-icon { font-size: 16px; line-height: 1; }
-  .vc-label { font-size: 9px; letter-spacing: 0.04em; color: var(--cream-dim); text-transform: uppercase; }
-  .vc-panel.vc-active .vc-label { color: var(--green-ready); }
-  .vc-panel.vc-muted  .vc-label { color: var(--card-red); }
+  .hand-row{display:flex;justify-content:center;align-items:flex-end;padding:6px 0 2px;min-height:96px;flex-wrap:nowrap;overflow-x:auto}
+  .pcard.in-hand{margin-left:-16px;cursor:pointer;transition:transform .15s,box-shadow .15s;flex-shrink:0}
+  .pcard.in-hand:first-child{margin-left:0}
+  .pcard.in-hand:hover{transform:translateY(-8px);z-index:5;box-shadow:0 8px 16px var(--shadow)}
+  .pcard.in-hand.sel{transform:translateY(-16px);border:2px solid var(--gold);box-shadow:0 0 14px rgba(212,175,55,.45),0 8px 14px var(--shadow);z-index:6}
 
-  /* Voice indicators around player avatars */
-  .speaking-ring {
-    position: absolute;
-    inset: -4px;
-    border-radius: 50%;
-    border: 2px solid var(--green-ready);
-    animation: speakPulse 0.8s ease-in-out infinite;
-    pointer-events: none;
-    display: none;
-  }
-  .speaking-ring.active { display: block; }
-  @keyframes speakPulse {
-    0%, 100% { opacity: 0.3; transform: scale(1); }
-    50%       { opacity: 1;   transform: scale(1.1); }
-  }
+  .sel-info{text-align:center;font-size:11px;color:var(--gold);min-height:14px}
+  .hint{text-align:center;font-size:11px;color:var(--cream-dim);min-height:14px;letter-spacing:.03em}
 
-  /* VC Players list overlay */
-  .vc-players {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    background: var(--panel-bg);
-    border: 1px solid var(--gold-dim);
-    border-radius: 10px;
-    padding: 10px;
-    min-width: 160px;
-    z-index: 200;
-    display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  }
-  .vc-players.open { display: block; }
-  .vc-players-title { font-size: 10px; letter-spacing: 0.1em; color: var(--cream-dim); text-transform: uppercase; margin-bottom: 8px; }
-  .vc-player-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; }
-  .vc-player-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cream-dim); flex-shrink: 0; }
-  .vc-player-dot.speaking { background: var(--green-ready); box-shadow: 0 0 6px var(--green-ready); }
-  .vc-player-dot.muted    { background: var(--card-red); }
-  .vc-join-btn {
-    margin-top: 8px;
-    width: 100%;
-    padding: 7px;
-    border-radius: 6px;
-    border: 1px solid var(--blue-vc);
-    background: rgba(59,130,246,0.15);
-    color: var(--blue-vc);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.2s ease;
-  }
-  .vc-join-btn:hover { background: var(--blue-vc); color: #fff; }
-  .vc-join-btn.leave-btn { border-color: var(--card-red); color: var(--card-red); background: rgba(194,59,59,0.1); }
-  .vc-join-btn.leave-btn:hover { background: var(--card-red); color: #fff; }
-  .vc-mute-btn {
-    margin-top: 4px;
-    width: 100%;
-    padding: 7px;
-    border-radius: 6px;
-    border: 1px solid var(--gold-dim);
-    background: transparent;
-    color: var(--cream-dim);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.2s ease;
-  }
-  .vc-mute-btn:hover { border-color: var(--gold); color: var(--gold); }
+  /* ── ACTION BAR ── */
+  .action-bar{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+  .btn{font-family:var(--font-m);font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+    padding:10px 18px;border-radius:22px;border:1px solid var(--gold-dim);
+    background:rgba(212,175,55,.06);color:var(--cream-dim);cursor:not-allowed;opacity:.35;
+    transition:all .2s;pointer-events:none}
+  .btn.on{cursor:pointer;opacity:1;color:var(--gold);border-color:var(--gold);background:rgba(212,175,55,.12);pointer-events:auto}
+  .btn.on:hover{background:var(--gold);color:#1a1a1a;box-shadow:0 0 14px rgba(212,175,55,.4)}
+  .btn.on:active{transform:scale(.97)}
+  .btn.danger.on{border-color:var(--red);color:var(--red)}
+  .btn.danger.on:hover{background:var(--red);color:var(--cream)}
 
-  /* ───────── OPPONENTS ROW ───────── */
-  .opponents-row {
-    display: flex;
-    justify-content: center;
-    gap: 28px;
-    padding: 10px 0 18px;
-    flex-wrap: wrap;
-  }
-  .opponent {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    opacity: 0.75;
-    transition: opacity 0.25s ease, transform 0.25s ease;
-  }
-  .opponent.active-turn { opacity: 1; transform: translateY(-3px); }
-  .opponent .avatar-wrap { position: relative; }
-  .opponent .avatar {
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--felt-light), var(--felt-edge));
-    border: 2px solid var(--gold-dim);
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-display); font-size: 17px; color: var(--gold);
-    position: relative;
-    z-index: 1;
-  }
-  .opponent.active-turn .avatar { border-color: var(--gold); box-shadow: 0 0 10px rgba(212,175,55,0.4); }
-  .opponent .name { font-size: 11px; color: var(--cream-dim); text-align: center; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .opponent.active-turn .name { color: var(--cream); }
-  .opponent .hand-mini { display: flex; }
-  .opponent .mini-card {
-    width: 13px; height: 19px;
-    background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
-    border: 1px solid var(--gold-dim);
-    border-radius: 2px;
-    margin-left: -5px;
-  }
-  .opponent .mini-card:first-child { margin-left: 0; }
-  .opponent .card-count { font-size: 10px; color: var(--cream-dim); }
-  .opponent .disconnected-tag { font-size: 9px; color: var(--card-red); }
+  /* ── TOAST ── */
+  .toast{position:fixed;bottom:220px;left:50%;transform:translateX(-50%) translateY(10px);
+    background:rgba(8,26,20,.96);border:1px solid var(--gold);color:var(--gold);
+    padding:7px 16px;border-radius:8px;font-size:11px;opacity:0;pointer-events:none;
+    transition:all .3s;z-index:50;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{border-color:var(--red);color:var(--red)}
+  .toast.info{border-color:var(--blue);color:var(--blue)}
 
-  /* ───────── CENTER TABLE ───────── */
-  .center-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 22px;
-    padding: 10px 0 20px;
-  }
+  /* ── MODAL BACKDROP ── */
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:150;align-items:center;justify-content:center;padding:16px}
+  .modal-bg.open{display:flex}
+  .modal{background:rgba(6,20,16,.98);border:1px solid var(--gold-dim);border-radius:14px;
+    padding:18px;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;gap:12px;
+    box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  .modal h3{font-family:var(--font-d);font-size:17px;color:var(--gold)}
+  .modal-close{background:none;border:1px solid var(--gold-dim);color:var(--cream-dim);font-size:14px;
+    width:28px;height:28px;border-radius:5px;cursor:pointer;flex-shrink:0;transition:all .2s}
+  .modal-close:hover{border-color:var(--red);color:var(--red)}
+  .rule-box{background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.2);border-radius:7px;
+    padding:9px 12px;font-size:10px;color:var(--cream-dim);line-height:1.65}
+  .rule-box strong{color:var(--gold)}
 
-  .piles-row {
-    display: flex;
-    align-items: center;
-    gap: 48px;
-  }
+  /* discard list */
+  .dc-wrap{overflow-y:auto;flex:1}
+  .dc-row{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:7px;border:1px solid transparent;transition:all .2s}
+  .dc-row.top{border-color:var(--gold-dim);background:rgba(212,175,55,.05)}
+  .dc-row.eatable{cursor:pointer;border-color:rgba(74,222,128,.18)}
+  .dc-row.eatable:hover{border-color:var(--green);background:rgba(74,222,128,.07);transform:translateX(3px)}
+  .dc-row.blocked{opacity:.4;cursor:not-allowed}
+  .dc-pos{font-size:9px;color:var(--cream-dim);min-width:22px;text-align:center}
+  .dc-info{flex:1}
+  .dc-name{font-size:12px;font-weight:600}
+  .dc-note{font-size:9px;margin-top:1px}
+  .dc-note.ok{color:var(--green)}
+  .dc-note.warn{color:var(--amber)}
+  .dc-note.err{color:var(--red)}
+  .dc-act{font-size:10px;padding:4px 10px;border-radius:14px;border:1px solid var(--green);
+    color:var(--green);background:rgba(74,222,128,.07);cursor:pointer;white-space:nowrap;
+    font-family:var(--font-m);letter-spacing:.04em;text-transform:uppercase;transition:all .2s}
+  .dc-act:hover{background:var(--green);color:#0D3B2E}
 
-  .pile-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .pile-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cream-dim); }
+  /* ── GAME OVER / SCORE BOARD ── */
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;align-items:center;justify-content:center;padding:16px}
+  .overlay.show{display:flex}
+  .score-box{background:rgba(8,26,20,.98);border:1px solid var(--gold);border-radius:14px;
+    padding:22px 20px;max-width:460px;width:100%;max-height:90vh;overflow-y:auto}
+  .score-box h2{font-family:var(--font-d);color:var(--gold);font-size:20px;text-align:center;margin-bottom:4px}
+  .score-subtitle{font-size:11px;color:var(--cream-dim);text-align:center;margin-bottom:14px}
 
-  /* Stock pile */
-  .stock-pile {
-    position: relative;
-    width: 58px; height: 82px;
-    cursor: pointer;
-    transition: transform 0.15s ease, opacity 0.15s ease;
-  }
-  .stock-pile:hover:not(.disabled) { transform: translateY(-2px); }
-  .stock-pile.disabled { cursor: not-allowed; opacity: 0.45; }
-  .stock-pile .stack-card {
-    position: absolute;
-    width: 58px; height: 82px;
-    border-radius: 6px;
-    background: linear-gradient(135deg, #232323, #161616);
-    border: 1px solid var(--gold-dim);
-    box-shadow: 0 4px 10px var(--shadow-deep);
-  }
-  .stock-pile .stack-card::after {
-    content: '◆';
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    color: var(--gold-dim); font-size: 18px; opacity: 0.5;
-  }
-  .stock-count { font-family: var(--font-display); font-size: 13px; color: var(--gold); }
+  /* History tabs */
+  .htabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--gold-dim);padding-bottom:8px}
+  .htab{padding:5px 12px;border-radius:5px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    cursor:pointer;border:1px solid var(--gold-dim);color:var(--cream-dim);font-family:var(--font-m);
+    background:transparent;transition:all .2s}
+  .htab.active{border-color:var(--gold);color:var(--gold);background:rgba(212,175,55,.1)}
 
-  /* Discard pile — clickable to open popup */
-  .discard-pile {
-    position: relative;
-    width: 110px; height: 86px;
-    cursor: pointer;
-  }
-  .discard-pile .dcard { position: absolute; width: 58px; height: 82px; transition: transform 0.2s ease; }
-  .discard-pile .dcard:nth-last-child(1) { left: 26px; top: 0; z-index: 3; }
-  .discard-pile .dcard:nth-last-child(2) { left: 13px; top: 2px; z-index: 2; opacity: 0.85; }
-  .discard-pile .dcard:nth-last-child(3) { left: 0; top: 4px; z-index: 1; opacity: 0.65; }
-  .discard-pile:hover .dcard:nth-last-child(1) { transform: translateY(-4px); }
-  .discard-count-badge {
-    position: absolute;
-    top: -8px; right: -8px;
-    background: var(--gold);
-    color: #1a1a1a;
-    font-size: 10px;
-    font-weight: 700;
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    z-index: 10;
-  }
+  /* Score table */
+  .stab{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px}
+  .stab th{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--cream-dim);
+    padding:4px 8px;border-bottom:1px solid var(--gold-dim);text-align:left;font-weight:400}
+  .stab td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .stab td.pts{color:var(--gold);font-weight:700;text-align:right}
+  .stab td.pts.neg{color:var(--red)}
+  .stab tr.winner td{color:var(--gold)}
+  .stab tr:last-child td{border-bottom:none}
 
-  /* ───────── PLAYING CARD ───────── */
-  .pcard {
-    width: 58px; height: 82px;
-    border-radius: 6px;
-    background: var(--card-face);
-    border: 1px solid rgba(0,0,0,0.15);
-    box-shadow: 0 3px 6px var(--shadow-deep);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 5px 6px;
-    font-family: var(--font-display);
-    font-weight: 600;
-    position: relative;
-  }
-  .pcard.red   { color: var(--card-red); }
-  .pcard.black { color: var(--card-black); }
-  .pcard .rank { font-size: 16px; line-height: 1; }
-  .pcard .suit { font-size: 16px; line-height: 1; align-self: flex-end; }
-  .pcard.joker {
-    background: linear-gradient(135deg, var(--gold) 0%, #b8860b 100%);
-    color: #1a1a1a;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    letter-spacing: 0;
-  }
+  /* Round history accordion */
+  .rh-section{margin-bottom:6px}
+  .rh-header{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;
+    border-radius:6px;background:rgba(212,175,55,.05);border:1px solid var(--gold-dim);cursor:pointer;
+    font-size:11px;color:var(--cream-dim)}
+  .rh-header .rh-round{color:var(--gold);font-weight:700}
+  .rh-body{display:none;padding:8px 0 4px}
+  .rh-body.open{display:block}
 
-  /* ───────── MY HAND ───────── */
-  .my-zone {
-    background: var(--panel-bg);
-    border-top: 1px solid var(--gold-dim);
-    padding: 14px 12px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
+  .over-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px}
+  .over-btn{padding:11px 20px;border-radius:8px;font-family:var(--font-m);font-size:12px;font-weight:700;
+    letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border:none;transition:all .2s}
+  .over-btn.primary{background:var(--gold);color:#1a1a1a}
+  .over-btn.primary:hover{box-shadow:0 0 16px rgba(212,175,55,.4)}
+  .over-btn.secondary{background:transparent;border:1px solid var(--gold-dim);color:var(--cream-dim)}
+  .over-btn.secondary:hover{border-color:var(--gold);color:var(--gold)}
 
-  .my-melds {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    min-height: 0;
-    padding: 0 4px;
+  @media(max-width:560px){
+    .pcard{width:46px;height:66px}
+    .pcard .c-rank{font-size:11px}
+    .pcard .c-suit{font-size:9px}
+    .pcard .c-ctr{font-size:17px}
+    .pcard .c-face{font-size:20px}
+    .pcard.in-hand{margin-left:-18px}
+    .piles-row{gap:26px}
+    .opponents{gap:14px}
+    .btn{padding:8px 12px;font-size:10px}
+    .topbar{flex-wrap:wrap}
   }
-  .meld-group {
-    display: flex;
-    padding: 4px;
-    border-radius: 6px;
-    background: rgba(212,175,55,0.06);
-    border: 1px dashed var(--gold-dim);
-  }
-  .meld-group .pcard {
-    width: 40px; height: 58px;
-    margin-left: -12px;
-    box-shadow: 0 2px 5px var(--shadow-deep);
-  }
-  .meld-group .pcard:first-child { margin-left: 0; }
-  .meld-group .pcard .rank,
-  .meld-group .pcard .suit { font-size: 11px; }
-
-  .hand-row {
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    padding: 8px 0 4px;
-    min-height: 100px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-  }
-  .pcard.in-hand {
-    margin-left: -18px;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    position: relative;
-    flex-shrink: 0;
-  }
-  .pcard.in-hand:first-child { margin-left: 0; }
-  .pcard.in-hand:hover {
-    transform: translateY(-8px);
-    z-index: 5;
-    box-shadow: 0 8px 14px var(--shadow-deep);
-  }
-  .pcard.in-hand.selected {
-    transform: translateY(-16px);
-    border: 2px solid var(--gold);
-    box-shadow: 0 0 14px rgba(212,175,55,0.45), 0 8px 14px var(--shadow-deep);
-    z-index: 6;
-  }
-
-  /* ───────── ACTION BAR ───────── */
-  .action-bar {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding-top: 4px;
-  }
-  .btn {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 11px 20px;
-    border-radius: 24px;
-    border: 1px solid var(--gold-dim);
-    background: rgba(212,175,55,0.06);
-    color: var(--cream-dim);
-    cursor: not-allowed;
-    opacity: 0.35;
-    transition: all 0.2s ease;
-    pointer-events: none;
-  }
-  .btn.enabled {
-    cursor: pointer;
-    opacity: 1;
-    color: var(--gold);
-    border-color: var(--gold);
-    background: rgba(212,175,55,0.12);
-    pointer-events: auto;
-  }
-  .btn.enabled:hover {
-    background: var(--gold);
-    color: #1a1a1a;
-    box-shadow: 0 0 16px rgba(212,175,55,0.45);
-  }
-  .btn.enabled:active { transform: scale(0.97); }
-  .btn.danger.enabled { border-color: var(--card-red); color: var(--card-red); }
-  .btn.danger.enabled:hover { background: var(--card-red); color: var(--cream); }
-
-  .hint-text {
-    text-align: center;
-    font-size: 11px;
-    color: var(--cream-dim);
-    letter-spacing: 0.03em;
-    min-height: 16px;
-    padding: 0 8px;
-  }
-
-  .selection-info {
-    text-align: center;
-    font-size: 11px;
-    color: var(--gold);
-    min-height: 14px;
-    letter-spacing: 0.03em;
-  }
-
-  /* ───────── TOAST ───────── */
-  .toast {
-    position: fixed;
-    bottom: 230px;
-    left: 50%;
-    transform: translateX(-50%) translateY(10px);
-    background: rgba(10,30,24,0.95);
-    border: 1px solid var(--gold);
-    color: var(--gold);
-    padding: 8px 18px;
-    border-radius: 8px;
-    font-size: 12px;
-    opacity: 0;
-    pointer-events: none;
-    transition: all 0.3s ease;
-    z-index: 50;
-    white-space: nowrap;
-    max-width: 90vw;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .toast.error { border-color: var(--card-red); color: var(--card-red); }
-  .toast.info  { border-color: var(--blue-vc); color: var(--blue-vc); }
-
-  /* ───────── DISCARD PILE POPUP ───────── */
-  .modal-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.72);
-    z-index: 150;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  .modal-backdrop.open { display: flex; }
-
-  .discard-modal {
-    background: rgba(8, 28, 22, 0.98);
-    border: 1px solid var(--gold-dim);
-    border-radius: 14px;
-    padding: 20px;
-    width: 100%;
-    max-width: 540px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-  }
-
-  .discard-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  .discard-modal-header h3 {
-    font-family: var(--font-display);
-    font-size: 18px;
-    color: var(--gold);
-  }
-  .discard-modal-header p {
-    font-size: 11px;
-    color: var(--cream-dim);
-    margin-top: 3px;
-    line-height: 1.5;
-  }
-  .modal-close {
-    background: none;
-    border: 1px solid var(--gold-dim);
-    color: var(--cream-dim);
-    font-size: 16px;
-    width: 30px; height: 30px;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    transition: all 0.2s ease;
-  }
-  .modal-close:hover { border-color: var(--card-red); color: var(--card-red); }
-
-  .discard-rule-box {
-    background: rgba(212,175,55,0.07);
-    border: 1px solid rgba(212,175,55,0.25);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 11px;
-    color: var(--cream-dim);
-    line-height: 1.6;
-  }
-  .discard-rule-box strong { color: var(--gold); }
-
-  .discard-cards-wrap {
-    overflow-y: auto;
-    flex: 1;
-  }
-  .discard-cards-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  /* Each row in discard popup = one card entry */
-  .discard-card-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid transparent;
-    transition: all 0.2s ease;
-  }
-  .discard-card-row.top-card {
-    border-color: var(--gold-dim);
-    background: rgba(212,175,55,0.06);
-  }
-  .discard-card-row.eatable-card {
-    cursor: pointer;
-    border-color: rgba(74,222,128,0.2);
-  }
-  .discard-card-row.eatable-card:hover {
-    border-color: var(--green-ready);
-    background: rgba(74,222,128,0.08);
-    transform: translateX(4px);
-  }
-  .discard-card-row.blocked-card {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-  .discard-card-row .dc-position {
-    font-size: 10px;
-    color: var(--cream-dim);
-    min-width: 24px;
-    text-align: center;
-    letter-spacing: 0.04em;
-  }
-  .discard-card-row .dc-card { flex-shrink: 0; }
-  .discard-card-row .dc-info { flex: 1; }
-  .discard-card-row .dc-info .dc-name { font-size: 13px; font-weight: 600; }
-  .discard-card-row .dc-info .dc-note { font-size: 10px; color: var(--cream-dim); margin-top: 2px; }
-  .discard-card-row .dc-info .dc-note.ok { color: var(--green-ready); }
-  .discard-card-row .dc-info .dc-note.warn { color: #F59E0B; }
-  .discard-card-row .dc-info .dc-note.err { color: var(--card-red); }
-  .discard-card-row .dc-action {
-    font-size: 11px;
-    padding: 5px 12px;
-    border-radius: 16px;
-    border: 1px solid var(--green-ready);
-    color: var(--green-ready);
-    background: rgba(74,222,128,0.08);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s ease;
-    font-family: var(--font-mono);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .discard-card-row .dc-action:hover { background: var(--green-ready); color: #0D3B2E; }
-
-  .discard-empty {
-    text-align: center;
-    padding: 30px;
-    color: var(--cream-dim);
-    font-size: 13px;
-  }
-
-  /* Small pcard variant for popup */
-  .pcard-sm {
-    width: 46px; height: 66px;
-    border-radius: 5px;
-    background: var(--card-face);
-    border: 1px solid rgba(0,0,0,0.15);
-    box-shadow: 0 2px 5px var(--shadow-deep);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 4px 5px;
-    font-family: var(--font-display);
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-  .pcard-sm.red   { color: var(--card-red); }
-  .pcard-sm.black { color: var(--card-black); }
-  .pcard-sm .rank { font-size: 13px; line-height: 1; }
-  .pcard-sm .suit { font-size: 13px; line-height: 1; align-self: flex-end; }
-  .pcard-sm.joker {
-    background: linear-gradient(135deg, var(--gold) 0%, #b8860b 100%);
-    color: #1a1a1a;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-  }
-
-  /* ───────── GAME OVER OVERLAY ───────── */
-  .overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.75);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  .overlay.show { display: flex; }
-  .overlay-box {
-    background: rgba(10,30,24,0.97);
-    border: 1px solid var(--gold);
-    border-radius: 14px;
-    padding: 28px 24px;
-    max-width: 400px;
-    width: 100%;
-    text-align: center;
-  }
-  .overlay-box h2 { font-family: var(--font-display); color: var(--gold); margin-bottom: 16px; font-size: 22px; }
-  .score-list { list-style: none; margin: 12px 0; }
-  .score-list li {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 12px;
-    margin-bottom: 6px;
-    background: rgba(255,255,255,0.03);
-    border-radius: 6px;
-    font-size: 13px;
-  }
-  .score-list li .pts { color: var(--gold); font-weight: bold; }
-  .overlay-btn {
-    margin-top: 18px;
-    padding: 12px 28px;
-    background: var(--gold);
-    color: #1a1a1a;
-    border: none;
-    border-radius: 8px;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .overlay-btn:hover { box-shadow: 0 0 16px rgba(212,175,55,0.4); }
-
-  /* ───────── STOCK EMPTY WARNING ───────── */
-  .stock-warning {
-    text-align: center;
-    font-size: 11px;
-    color: #F59E0B;
-    letter-spacing: 0.04em;
-    padding: 4px 8px;
-    border-radius: 6px;
-    background: rgba(245,158,11,0.1);
-    border: 1px solid rgba(245,158,11,0.3);
-    display: none;
-  }
-  .stock-warning.visible { display: block; }
-
-  @media (max-width: 560px) {
-    .pcard { width: 46px; height: 66px; }
-    .pcard .rank, .pcard .suit { font-size: 13px; }
-    .pcard.in-hand { margin-left: -22px; }
-    .piles-row { gap: 28px; }
-    .opponents-row { gap: 16px; }
-    .btn { padding: 9px 14px; font-size: 11px; }
-    .topbar { flex-wrap: wrap; }
-    .turn-indicator { font-size: 12px; }
-    .discard-modal { max-height: 90vh; padding: 14px; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; animation: none !important; }
-  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<div class="table-wrap">
-
-  <!-- TOP BAR -->
+  <!-- TOPBAR -->
   <div class="topbar">
-    <div class="room-info">
-      <span class="label">Kode Ruang</span>
-      <span class="code" id="roomCode">-----</span>
+    <div>
+      <div class="room-lbl">Kode Ruang</div>
+      <div class="room-code" id="roomCode">-----</div>
     </div>
-    <div class="turn-indicator" id="turnIndicator">Memuat...</div>
-    <div class="topbar-right">
-      <!-- Voice Chat -->
-      <div class="vc-panel" id="vcPanel" onclick="toggleVcMenu()">
-        <span class="vc-icon" id="vcIcon">🎙️</span>
-        <span class="vc-label" id="vcLabel">Suara</span>
-        <!-- VC dropdown -->
-        <div class="vc-players" id="vcPlayersMenu" onclick="event.stopPropagation()">
-          <div class="vc-players-title">Voice Chat</div>
-          <div id="vcPlayersList"></div>
-          <button class="vc-join-btn" id="vcJoinBtn" onclick="joinVoiceChat()">Gabung Suara</button>
-          <button class="vc-mute-btn" id="vcMuteBtn" onclick="toggleMute()" style="display:none;">Matikan Mic</button>
-        </div>
-      </div>
-      <div class="phase-tag">
-        Fase
-        <span class="phase-name" id="phaseTag">-</span>
-      </div>
+    <div class="turn-pill" id="turnPill">Memuat...</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="phase-badge">Fase<span id="phaseTag">-</span></div>
+      <button class="btn-icon" onclick="openScoreHistory()">📊 Skor</button>
     </div>
   </div>
 
   <!-- OPPONENTS -->
-  <div class="opponents-row" id="opponentsRow">
-    <div style="font-size:12px;color:var(--cream-dim);">Memuat pemain...</div>
-  </div>
+  <div class="opponents" id="opponents"><div style="font-size:11px;color:var(--cream-dim)">Memuat...</div></div>
 
   <!-- CENTER TABLE -->
-  <div class="center-area">
-    <!-- Stock empty warning -->
-    <div class="stock-warning" id="stockWarning">
-      ⚠ Stock hampir habis — permainan akan berakhir saat stock kosong!
-    </div>
-
+  <div class="center">
+    <div class="stock-warn" id="stockWarn"></div>
     <div class="piles-row">
       <div class="pile-block">
-        <div class="stock-pile disabled" id="stockPile" onclick="drawFromStock()">
-          <div class="stack-card" style="transform:translateY(2px) translateX(2px);opacity:0.5;"></div>
-          <div class="stack-card" style="transform:translateY(1px) translateX(1px);opacity:0.75;"></div>
-          <div class="stack-card"></div>
+        <div class="stock-pile-wrap disabled" id="stockWrap" onclick="drawFromStock()">
+          <div class="stock-shadow pcard back"></div>
+          <div class="stock-shadow pcard back"></div>
+          <div class="stock-shadow pcard back"></div>
+          <div class="stock-top" id="stockTop"></div>
         </div>
-        <span class="stock-count" id="stockCount">-- kartu</span>
-        <span class="pile-label">Stock</span>
+        <div class="stock-count" id="stockCount">-- kartu</div>
+        <div class="pile-lbl">Stock</div>
       </div>
-
       <div class="pile-block">
-        <!-- Clicking discard pile opens the popup -->
-        <div class="discard-pile" id="discardPile" onclick="openDiscardModal()">
-          <div style="width:58px;height:82px;border:1px dashed var(--gold-dim);border-radius:6px;opacity:0.4;"></div>
-          <div class="discard-count-badge" id="discardCountBadge" style="display:none;">0</div>
+        <div class="discard-pile-wrap" id="discardWrap" onclick="openDiscardModal()">
+          <div class="empty-pile" id="discardEmpty"></div>
+          <div class="discard-count" id="discardBadge" style="display:none">0</div>
         </div>
-        <span class="pile-label">Buangan <span style="color:var(--gold);font-size:9px;">(klik lihat semua)</span></span>
+        <div class="pile-lbl">Buangan <span style="color:var(--gold);font-size:8px">(klik)</span></div>
       </div>
     </div>
   </div>
@@ -800,1048 +326,652 @@
   <!-- MY ZONE -->
   <div class="my-zone">
     <div class="my-melds" id="myMelds"></div>
-
-    <div class="hand-row" id="handRow">
-      <div style="font-size:12px;color:var(--cream-dim);">Menunggu kartu...</div>
-    </div>
-
-    <div class="selection-info" id="selectionInfo"></div>
-    <div class="hint-text" id="hintText">Menunggu permainan dimulai...</div>
-
+    <div class="hand-row" id="handRow"><div style="font-size:11px;color:var(--cream-dim);padding:8px">Menunggu kartu...</div></div>
+    <div class="sel-info" id="selInfo"></div>
+    <div class="hint" id="hint">Menunggu permainan dimulai...</div>
     <div class="action-bar">
-      <button class="btn" id="btnMeld"    onclick="attemptMeld()">Turun Seri</button>
+      <button class="btn" id="btnMeld" onclick="attemptMeld()">Turun Seri</button>
       <button class="btn" id="btnDiscard" onclick="attemptDiscard()">Buang Kartu</button>
       <button class="btn danger" id="btnClose" onclick="attemptClose()">Tutup Game</button>
     </div>
   </div>
-
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- ═══════ DISCARD PILE MODAL ═══════ -->
-<div class="modal-backdrop" id="discardModal">
-  <div class="discard-modal">
-    <div class="discard-modal-header">
+<!-- DISCARD MODAL -->
+<div class="modal-bg" id="discardModal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div>
         <h3>🗂 Tumpukan Buangan</h3>
-        <p id="discardModalSubtitle">Kartu paling atas (posisi 1) bisa langsung diambil jika bisa dikombinasikan.</p>
+        <p style="font-size:10px;color:var(--cream-dim);margin-top:3px" id="discardSub"></p>
       </div>
       <button class="modal-close" onclick="closeDiscardModal()">✕</button>
     </div>
-
-    <div class="discard-rule-box" id="discardRuleBox">
+    <div class="rule-box">
       <strong>Aturan Ambil Buangan:</strong><br>
       • <strong>Makan Atas (Rel):</strong> Ambil kartu teratas — wajib langsung bisa dikombinasikan dengan min. 2 kartu di tangan.<br>
       • <strong>Makan Tengah:</strong> Hanya boleh jika sudah punya <strong>dasar seri</strong>. Semua kartu di atasnya ikut diambil.<br>
-      • <strong>Joker</strong> di tumpukan tidak bisa diambil via Makan Tengah.
+      • <strong>Joker</strong> di tumpukan tidak bisa diambil via Makan Tengah.<br>
+      • <span id="eatDepthRule" style="color:var(--amber)"></span>
     </div>
-
-    <div class="discard-cards-wrap">
-      <div class="discard-cards-grid" id="discardCardsList">
-        <div class="discard-empty">Belum ada kartu di tumpukan buangan.</div>
-      </div>
-    </div>
+    <div class="dc-wrap"><div id="dcList"></div></div>
   </div>
 </div>
 
-<!-- ═══════ GAME OVER OVERLAY ═══════ -->
-<div class="overlay" id="overlayGameOver">
-  <div class="overlay-box">
-    <h2 id="overlayTitle">🏁 Putaran Selesai</h2>
-    <p id="overlaySubtitle" style="font-size:12px;color:var(--cream-dim);margin-bottom:12px;"></p>
-    <ul class="score-list" id="overlayScores"></ul>
-    <p style="font-size:11px;color:var(--cream-dim);margin-top:10px;">Total Akumulasi:</p>
-    <ul class="score-list" id="overlayTotal"></ul>
-    <button class="overlay-btn" onclick="goToLobby()">Kembali ke Lobby</button>
+<!-- SCORE / GAME OVER OVERLAY -->
+<div class="overlay" id="scoreOverlay">
+  <div class="score-box">
+    <h2 id="scoreTitle">📊 Papan Skor</h2>
+    <div class="score-subtitle" id="scoreSubtitle"></div>
+
+    <div class="htabs">
+      <button class="htab active" id="tabRound" onclick="switchScoreTab('round')">Babak Ini</button>
+      <button class="htab" id="tabTotal" onclick="switchScoreTab('total')">Total</button>
+      <button class="htab" id="tabHistory" onclick="switchScoreTab('history')">Histori</button>
+    </div>
+
+    <div id="tabPanelRound"></div>
+    <div id="tabPanelTotal" style="display:none"></div>
+    <div id="tabPanelHistory" style="display:none"></div>
+
+    <div class="over-btns" id="overBtns" style="display:none">
+      <button class="over-btn primary" onclick="doNextRound()">▶ Lanjut Main (Skor Dipertahankan)</button>
+      <button class="over-btn secondary" onclick="doNewGame()">↺ Mulai Baru (Reset Skor)</button>
+      <button class="over-btn secondary" onclick="goToLobby()">← Kembali ke Lobby</button>
+    </div>
+    <div id="closeBtnWrap" style="display:none;text-align:center;margin-top:8px">
+      <button class="over-btn secondary" onclick="closeScoreOverlay()">✕ Tutup</button>
+    </div>
   </div>
 </div>
 
 <script src="client.js"></script>
 <script>
-/* =====================================================
-   KONSTANTA & HELPER
-   ===================================================== */
+/* =====================================================================
+   CARD RENDERING — Real playing card visuals
+   ===================================================================== */
 
-const SUIT_COLOR   = { '♠': 'black', '♣': 'black', '♥': 'red', '♦': 'red' };
-const PHASE_LABELS = { DRAW: 'Ambil Kartu', MELD: 'Susun / Buang', GAME_OVER: 'Selesai' };
+const SUIT_COLOR  = {'♠':'black','♣':'black','♥':'red','♦':'red'};
+const RANK_SYMBOL = {'J':'J','Q':'Q','K':'K','A':'A'};
+const FACE_EMOJI  = {'J':'🕴','Q':'👸','K':'🤴'};
 
-// Redirect ke lobby jika tidak ada sesi
-const _session = RemiClient.getSession();
-if (!_session.playerId || !_session.roomCode) {
-  window.location.href = 'lobby.html';
-}
+// Large Unicode pip chars
+const PIP = {'♠':'♠','♥':'♥','♦':'♦','♣':'♣'};
 
-let myId   = _session.playerId;
-let myName = '';
-
-/* =====================================================
-   STATE — disinkronkan dari server
-   ===================================================== */
-let state = {
-  phase:            'DRAW',
-  currentTurn:      '',
-  currentTurnName:  '',
-  isMyTurn:         false,
-  stockRemaining:   0,
-  discardPileTop3:  [],
-  discardPileFull:  [],  // full discard pile dari server (jika tersedia)
-  discardCount:     0,
-  opponents:        [],
-  myHand:           [],
-  myMelds:          [],
-  myHasBaseSeries:  false,
-  selected:         new Set()
-};
-
-/* =====================================================
-   PARSE & RENDER KARTU
-   ===================================================== */
 function parseCard(str) {
   if (!str) return null;
-  if (str.startsWith('JOKER')) return { rank: 'JOKER', suit: null, isJoker: true, id: str };
+  if (str.startsWith('JOKER')) return { rank:'JOKER', suit:null, isJoker:true, id:str };
   const suit = str.slice(-1);
-  const rank = str.slice(0, -1);
-  return { rank, suit, isJoker: false, id: str };
+  const rank = str.slice(0,-1);
+  return { rank, suit, isJoker:false, id:str };
 }
 
-function renderCardEl(cardStr, opts = {}) {
+function isNumericRank(rank) {
+  return !isNaN(parseInt(rank)) && parseInt(rank) >= 2 && parseInt(rank) <= 10;
+}
+
+function isFaceRank(rank) { return ['J','Q','K'].includes(rank); }
+
+/**
+ * Create a realistic playing card element.
+ * size: 'normal' (58×82) | 'small' (46×66) | 'meld' (38×54)
+ */
+function makeCard(cardStr, opts={}) {
   const c = parseCard(cardStr);
   if (!c) return document.createElement('div');
+
   const el = document.createElement('div');
-  el.className = 'pcard ' + (c.isJoker ? 'joker' : (SUIT_COLOR[c.suit] || 'black'));
-  if (opts.extraClass) el.className += ' ' + opts.extraClass;
+  const sizeClass = opts.size === 'small' ? ' pcard-sm' : '';
+  const extraClass = opts.extraClass ? ' '+opts.extraClass : '';
+
+  if (c.isJoker) {
+    el.className = 'pcard joker' + sizeClass + extraClass;
+    el.dataset.cardId = cardStr;
+    const cj = document.createElement('div');
+    cj.className = 'c-joker';
+    cj.textContent = '🃏';
+    el.appendChild(cj);
+    const lbl = document.createElement('div');
+    lbl.style.cssText='position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:8px;letter-spacing:.05em;color:rgba(212,175,55,.7)';
+    lbl.textContent='JOKER';
+    el.appendChild(lbl);
+    return el;
+  }
+
+  const colorClass = SUIT_COLOR[c.suit] || 'black';
+  el.className = 'pcard ' + colorClass + sizeClass + extraClass;
   el.dataset.cardId = cardStr;
-  if (c.isJoker) {
-    el.textContent = '🃏';
+
+  // Top-left corner
+  const tl = document.createElement('div');
+  tl.className = 'c-tl';
+  tl.innerHTML = `<div class="c-rank">${c.rank}</div><div class="c-suit">${c.suit}</div>`;
+  el.appendChild(tl);
+
+  // Bottom-right corner (rotated)
+  const br = document.createElement('div');
+  br.className = 'c-br';
+  br.innerHTML = `<div class="c-rank">${c.rank}</div><div class="c-suit">${c.suit}</div>`;
+  el.appendChild(br);
+
+  // Center: face card or pip
+  const ctr = document.createElement('div');
+  if (isFaceRank(c.rank)) {
+    ctr.className = 'c-face';
+    ctr.textContent = FACE_EMOJI[c.rank] || c.rank;
+  } else if (c.rank === 'A') {
+    ctr.className = 'c-ctr';
+    ctr.style.fontSize = opts.size === 'small' ? '22px' : '28px';
+    ctr.textContent = c.suit;
   } else {
-    const rankEl = document.createElement('div');
-    rankEl.className = 'rank';
-    rankEl.textContent = c.rank;
-    const suitEl = document.createElement('div');
-    suitEl.className = 'suit';
-    suitEl.textContent = c.suit;
-    el.appendChild(rankEl);
-    el.appendChild(suitEl);
+    ctr.className = 'c-ctr';
+    ctr.textContent = c.suit;
   }
+  el.appendChild(ctr);
+
   return el;
 }
 
-function renderCardSmEl(cardStr) {
-  const c = parseCard(cardStr);
-  if (!c) return document.createElement('div');
+function makeCardBack() {
   const el = document.createElement('div');
-  el.className = 'pcard-sm ' + (c.isJoker ? 'joker' : (SUIT_COLOR[c.suit] || 'black'));
-  if (c.isJoker) {
-    el.textContent = '🃏';
-  } else {
-    const rankEl = document.createElement('div');
-    rankEl.className = 'rank';
-    rankEl.textContent = c.rank;
-    const suitEl = document.createElement('div');
-    suitEl.className = 'suit';
-    suitEl.textContent = c.suit;
-    el.appendChild(rankEl);
-    el.appendChild(suitEl);
-  }
+  el.className = 'pcard back';
   return el;
 }
 
-/* =====================================================
-   RENDER UTAMA
-   ===================================================== */
+/* =====================================================================
+   STATE
+   ===================================================================== */
+
+const _sess = RemiClient.getSession();
+if (!_sess.playerId || !_sess.roomCode) window.location.href = 'lobby.html';
+
+let myId = _sess.playerId;
+
+let S = {
+  phase:'DRAW', currentTurn:'', currentTurnName:'', isMyTurn:false,
+  stockRemaining:0, discardPileTop3:[], discardPileFull:[], discardCount:0,
+  maxEatDepth:Infinity,
+  opponents:[], myHand:[], myMelds:[], myHasBaseSeries:false,
+  selected:new Set(),
+  roundHistory:[], totalScores:{}, lastRoundScores:[], winner:null, winnerName:null,
+  isGameOver:false, stockEmpty:false
+};
+
+const PHASE_LABEL = {DRAW:'Ambil Kartu', MELD:'Susun / Buang', GAME_OVER:'Selesai'};
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+
 function render() {
-  const roomCode = RemiClient.getSession().roomCode || '-----';
-  document.getElementById('roomCode').textContent = roomCode;
+  document.getElementById('roomCode').textContent = RemiClient.getSession().roomCode || '-----';
 
-  const turnName = state.isMyTurn ? 'Giliranmu!' : `Giliran: ${state.currentTurnName || '...'}`;
-  const turnEl = document.getElementById('turnIndicator');
-  turnEl.textContent = turnName;
-  turnEl.classList.toggle('my-turn', state.isMyTurn);
+  const tpEl = document.getElementById('turnPill');
+  tpEl.textContent = S.isMyTurn ? '⭐ Giliranmu!' : `Giliran: ${S.currentTurnName || '...'}`;
+  tpEl.classList.toggle('mine', S.isMyTurn);
 
-  document.getElementById('phaseTag').textContent = PHASE_LABELS[state.phase] || state.phase;
+  document.getElementById('phaseTag').textContent = PHASE_LABEL[S.phase] || S.phase;
 
   renderOpponents();
-
-  // STOCK
-  const stockEl  = document.getElementById('stockPile');
-  const stockNum = state.stockRemaining;
-  document.getElementById('stockCount').textContent = stockNum + ' kartu';
-  const canDraw = state.isMyTurn && state.phase === 'DRAW' && stockNum > 0;
-  stockEl.classList.toggle('disabled', !canDraw);
-
-  // Stock warning
-  const warn = document.getElementById('stockWarning');
-  if (stockNum > 0 && stockNum <= 5) {
-    warn.classList.add('visible');
-    warn.textContent = `⚠ Stock tersisa ${stockNum} kartu — permainan hampir berakhir!`;
-  } else if (stockNum === 0) {
-    warn.classList.add('visible');
-    warn.textContent = '📦 Stock habis — permainan berakhir setelah giliran ini!';
-  } else {
-    warn.classList.remove('visible');
-  }
-
-  // DISCARD PILE preview (top 3)
-  renderDiscardPilePreview();
-
-  // DISCARD COUNT BADGE
-  const badge = document.getElementById('discardCountBadge');
-  if (state.discardCount > 0) {
-    badge.style.display = 'flex';
-    badge.textContent   = state.discardCount;
-  } else {
-    badge.style.display = 'none';
-  }
-
+  renderStock();
+  renderDiscardPreview();
   renderMyMelds();
-  renderMyHand();
+  renderHand();
   updateButtons();
-  document.getElementById('hintText').textContent = getHint();
+  renderHint();
 }
 
 function renderOpponents() {
-  const row = document.getElementById('opponentsRow');
+  const row = document.getElementById('opponents');
   row.innerHTML = '';
-  if (!state.opponents || state.opponents.length === 0) {
-    row.innerHTML = '<div style="font-size:12px;color:var(--cream-dim);">-</div>';
-    return;
-  }
-  state.opponents.forEach(op => {
-    const div = document.createElement('div');
-    div.className = 'opponent' + (op.active ? ' active-turn' : '');
-    const initials     = (op.name || op.id || '?').slice(0, 2).toUpperCase();
-    const displayName  = op.name || op.id || '?';
-    const cardCount    = Math.min(op.handCount, 12);
-    const vcStatus     = vcState.peers[op.id];
-    const speakingClass = (vcStatus && vcStatus.speaking) ? 'active' : '';
-
-    div.innerHTML = `
-      <div class="avatar-wrap">
-        <div class="avatar">${initials}</div>
-        <div class="speaking-ring ${speakingClass}" data-peer="${op.id}"></div>
-      </div>
-      <div class="name" title="${displayName}">${displayName}</div>
-      <div class="hand-mini">
-        ${'<div class="mini-card"></div>'.repeat(cardCount)}
-      </div>
-      <div class="card-count">${op.handCount} kartu</div>
-      ${!op.connected ? '<div class="disconnected-tag">⚠ putus</div>' : ''}
-    `;
-    row.appendChild(div);
+  if (!S.opponents.length) { row.innerHTML='<div style="font-size:10px;color:var(--cream-dim)">-</div>'; return; }
+  S.opponents.forEach(op => {
+    const d = document.createElement('div');
+    d.className = 'opp' + (op.active ? ' active' : '');
+    const ini = (op.name||op.id||'?').slice(0,2).toUpperCase();
+    const cnt = Math.min(op.handCount, 12);
+    d.innerHTML = `
+      <div class="opp-av">${ini}</div>
+      <div class="opp-name" title="${op.name}">${op.name}</div>
+      <div class="opp-cards">${'<div class="mini-c"></div>'.repeat(cnt)}</div>
+      <div class="opp-count">${op.handCount} kartu${!op.connected?' · ⚠putus':''}</div>`;
+    row.appendChild(d);
   });
 }
 
-function renderDiscardPilePreview() {
-  const dPile = document.getElementById('discardPile');
-  // Remove existing card elements but keep badge
-  Array.from(dPile.querySelectorAll('.dcard')).forEach(el => el.remove());
+function renderStock() {
+  const wrap = document.getElementById('stockWrap');
+  const n    = S.stockRemaining;
+  document.getElementById('stockCount').textContent = n + ' kartu';
 
-  if (!state.discardPileTop3 || state.discardPileTop3.length === 0) {
-    const empty = document.createElement('div');
-    empty.style.cssText = 'width:58px;height:82px;border:1px dashed var(--gold-dim);border-radius:6px;opacity:0.4;';
-    dPile.insertBefore(empty, dPile.firstChild);
-    return;
+  // Update the top card visual (just a card back)
+  const top = document.getElementById('stockTop');
+  top.innerHTML = '';
+  if (n > 0) {
+    top.appendChild(makeCardBack());
   }
 
-  state.discardPileTop3.forEach(c => {
-    const el = renderCardEl(c, { extraClass: 'dcard' });
-    dPile.insertBefore(el, dPile.firstChild);
+  const canDraw = S.isMyTurn && S.phase === 'DRAW' && n > 0;
+  wrap.classList.toggle('disabled', !canDraw);
+
+  const warn = document.getElementById('stockWarn');
+  if (n === 0) { warn.textContent='📦 Stock habis — game berakhir setelah giliran ini!'; warn.classList.add('show'); }
+  else if (n <= 5) { warn.textContent=`⚠ Stock tersisa ${n} kartu!`; warn.classList.add('show'); }
+  else { warn.classList.remove('show'); }
+}
+
+function renderDiscardPreview() {
+  const wrap  = document.getElementById('discardWrap');
+  const badge = document.getElementById('discardBadge');
+  const empty = document.getElementById('discardEmpty');
+
+  // Remove old dcard elements
+  wrap.querySelectorAll('.dcard').forEach(el => el.remove());
+
+  if (!S.discardPileTop3.length) {
+    empty.style.display = 'block';
+    badge.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+
+  // top3 from server is bottom→top, render oldest first
+  S.discardPileTop3.forEach(c => {
+    const el = makeCard(c, {extraClass:'dcard'});
+    wrap.insertBefore(el, wrap.firstChild);
   });
+
+  badge.style.display = 'flex';
+  badge.textContent   = S.discardCount;
 }
 
 function renderMyMelds() {
-  const meldsWrap = document.getElementById('myMelds');
-  meldsWrap.innerHTML = '';
-  if (!state.myMelds || state.myMelds.length === 0) return;
-  state.myMelds.forEach(meld => {
-    if (!meld || !meld.length) return;
-    const group = document.createElement('div');
-    group.className = 'meld-group';
-    meld.forEach(c => group.appendChild(renderCardEl(c)));
-    meldsWrap.appendChild(group);
+  const wrap = document.getElementById('myMelds');
+  wrap.innerHTML = '';
+  (S.myMelds||[]).forEach(meld => {
+    if (!meld||!meld.length) return;
+    const g = document.createElement('div');
+    g.className = 'meld-group';
+    meld.forEach(c => g.appendChild(makeCard(c)));
+    wrap.appendChild(g);
   });
 }
 
-function renderMyHand() {
-  const handRow = document.getElementById('handRow');
-  handRow.innerHTML = '';
-  if (!state.myHand || state.myHand.length === 0) {
-    handRow.innerHTML = '<div style="font-size:12px;color:var(--cream-dim);padding:8px;">Tangan kosong</div>';
+function renderHand() {
+  const row = document.getElementById('handRow');
+  row.innerHTML = '';
+  if (!S.myHand.length) {
+    row.innerHTML='<div style="font-size:11px;color:var(--cream-dim);padding:8px">Tangan kosong</div>';
+    document.getElementById('selInfo').textContent = '';
     return;
   }
-  state.myHand.forEach((c, idx) => {
-    const selected = state.selected.has(idx);
-    const el = renderCardEl(c, { extraClass: 'in-hand' + (selected ? ' selected' : '') });
+  S.myHand.forEach((c, idx) => {
+    const sel = S.selected.has(idx);
+    const el  = makeCard(c, {extraClass:'in-hand'+(sel?' sel':'')});
     el.onclick = () => toggleSelect(idx);
-    el.title = c + (selected ? ' (dipilih)' : '');
-    handRow.appendChild(el);
+    el.title   = c + (sel ? ' (dipilih)' : '');
+    row.appendChild(el);
   });
-  const selInfo = document.getElementById('selectionInfo');
-  if (state.selected.size > 0) {
-    const selectedCards = [...state.selected].map(i => state.myHand[i]).join(', ');
-    selInfo.textContent = `Dipilih (${state.selected.size}): ${selectedCards}`;
+  const si = document.getElementById('selInfo');
+  if (S.selected.size > 0) {
+    si.textContent = `Dipilih (${S.selected.size}): ${[...S.selected].map(i=>S.myHand[i]).join(', ')}`;
   } else {
-    selInfo.textContent = '';
+    si.textContent = '';
   }
 }
 
 function updateButtons() {
-  const myTurn  = state.isMyTurn;
-  const isMeld  = state.phase === 'MELD';
-  const sel     = state.selected.size;
-  const handLen = state.myHand.length;
-
-  setBtnEnabled('btnMeld',    myTurn && isMeld && sel >= 3);
-  setBtnEnabled('btnDiscard', myTurn && isMeld && sel === 1);
-  setBtnEnabled('btnClose',
-    myTurn && isMeld && handLen === 1 && sel === 1 && state.myHasBaseSeries
-  );
+  const isMeld = S.phase === 'MELD';
+  const sel    = S.selected.size;
+  const hLen   = S.myHand.length;
+  setBtn('btnMeld',    S.isMyTurn && isMeld && sel >= 3);
+  setBtn('btnDiscard', S.isMyTurn && isMeld && sel === 1);
+  setBtn('btnClose',   S.isMyTurn && isMeld && hLen === 1 && sel === 1 && S.myHasBaseSeries);
 }
 
-function setBtnEnabled(id, enabled) {
-  document.getElementById(id).classList.toggle('enabled', !!enabled);
+function setBtn(id, on) { document.getElementById(id).classList.toggle('on', !!on); }
+
+function renderHint() {
+  const el = document.getElementById('hint');
+  if (S.phase === 'GAME_OVER') { el.textContent='🏁 Permainan selesai.'; return; }
+  if (!S.isMyTurn) { el.textContent=`Menunggu giliran ${S.currentTurnName||'...'}...`; return; }
+  if (S.phase === 'DRAW') {
+    el.textContent='Ambil dari Stock, atau klik tumpukan Buangan untuk lihat & pilih kartu buangan.';
+    return;
+  }
+  const sel = S.selected.size;
+  if (sel === 0) el.textContent = S.myHasBaseSeries ? 'Pilih 3+ kartu untuk seri/kembar, atau 1 kartu untuk dibuang.' : 'Pilih min. 3 kartu untuk membuat dasar seri pertama.';
+  else if (sel === 1) el.textContent = S.myHand.length===1&&S.myHasBaseSeries ? 'Klik "Tutup Game" untuk menang!' : 'Klik "Buang Kartu" untuk mengakhiri giliran.';
+  else if (sel >= 3) el.textContent = `${sel} kartu dipilih — klik "Turun Seri" untuk letakkan.`;
+  else el.textContent = `${sel} kartu dipilih.`;
 }
 
-function getHint() {
-  if (state.phase === 'GAME_OVER') return '🏁 Permainan selesai.';
-  if (!state.isMyTurn) return `Menunggu giliran ${state.currentTurnName || '...'}...`;
-  if (state.phase === 'DRAW') {
-    return 'Ambil kartu dari Stock, atau klik tumpukan Buangan untuk lihat semua & pilih yang mau diambil.';
-  }
-  if (state.phase === 'MELD') {
-    const sel = state.selected.size;
-    if (sel === 0) {
-      return state.myHasBaseSeries
-        ? 'Pilih 3+ kartu untuk turun seri/kembar, atau 1 kartu untuk dibuang.'
-        : 'Pilih 3+ kartu seri untuk dijadikan dasar seri pertama.';
-    }
-    if (sel === 1) {
-      return state.myHand.length === 1 && state.myHasBaseSeries
-        ? 'Klik "Tutup Game" untuk menutup permainan.'
-        : 'Klik "Buang Kartu" untuk mengakhiri giliran.';
-    }
-    if (sel >= 3) return `${sel} kartu dipilih — klik "Turun Seri" untuk meletakkan kombinasi.`;
-    return `${sel} kartu dipilih.`;
-  }
-  return '';
-}
-
-/* =====================================================
-   DISCARD PILE MODAL
-   ===================================================== */
-
-/**
- * Evaluate whether a card at `posFromTop` in the discard pile
- * is eat-able given current state. Returns { allowed, note, noteClass }
- */
-function evaluateEatability(cardStr, posFromTop) {
-  const isTop     = posFromTop === 0;
-  const isJoker   = cardStr.startsWith('JOKER');
-  const hasSeries = state.myHasBaseSeries;
-
-  // Not your turn / wrong phase
-  if (!state.isMyTurn || state.phase !== 'DRAW') {
-    return { allowed: false, note: 'Bukan giliran kamu', noteClass: 'err' };
-  }
-
-  // Joker in middle
-  if (isJoker && !isTop) {
-    return { allowed: false, note: 'Joker tidak bisa diambil via Makan Tengah', noteClass: 'err' };
-  }
-
-  // Middle card requires base series
-  if (!isTop && !hasSeries) {
-    return { allowed: false, note: 'Makan Tengah butuh dasar seri dulu', noteClass: 'warn' };
-  }
-
-  if (isTop) {
-    return {
-      allowed: true,
-      note: 'Makan Atas — wajib langsung dikombinasikan',
-      noteClass: 'ok'
-    };
-  }
-
-  // Middle: allowed (server will do final combo check)
-  const posLabel = posFromTop + 1;
-  return {
-    allowed: true,
-    note: `Makan Tengah — ${posLabel} kartu dari atas ikut diambil`,
-    noteClass: 'ok'
-  };
-}
+/* =====================================================================
+   DISCARD MODAL
+   ===================================================================== */
 
 function openDiscardModal() {
   const modal = document.getElementById('discardModal');
   modal.classList.add('open');
 
-  const list      = document.getElementById('discardCardsList');
-  const subtitle  = document.getElementById('discardModalSubtitle');
-  const ruleBox   = document.getElementById('discardRuleBox');
+  // depth rule label
+  const depthEl = document.getElementById('eatDepthRule');
+  if (S.maxEatDepth === Infinity) depthEl.textContent = '';
+  else depthEl.textContent = `Permainan ini: maksimal ${S.maxEatDepth} kartu teratas yang boleh diambil dari buangan.`;
 
-  // Show different rule context depending on turn / baseSeries
-  if (!state.isMyTurn || state.phase !== 'DRAW') {
-    subtitle.textContent  = 'Hanya bisa mengambil saat giliran kamu di fase Ambil Kartu.';
-    ruleBox.style.display = 'block';
+  const subtitle = document.getElementById('discardSub');
+  if (!S.isMyTurn || S.phase !== 'DRAW') {
+    subtitle.textContent = 'Hanya bisa mengambil saat giliranmu di fase Ambil Kartu.';
   } else {
-    subtitle.textContent  = state.myHasBaseSeries
-      ? 'Kamu sudah punya dasar seri — bisa Makan Atas atau Makan Tengah.'
-      : 'Kamu belum punya dasar seri — hanya bisa Makan Atas (kartu paling atas).';
-    ruleBox.style.display = 'block';
+    subtitle.textContent = S.myHasBaseSeries ? 'Kamu sudah punya dasar seri — bisa Makan Atas atau Makan Tengah.' : 'Belum punya dasar seri — hanya bisa Makan Atas.';
   }
 
-  // Build the full list from discardPileFull if available, otherwise top3
-  const allCards = state.discardPileFull.length > 0
-    ? state.discardPileFull
-    : state.discardPileTop3;
-
+  const list = document.getElementById('dcList');
   list.innerHTML = '';
 
-  if (!allCards || allCards.length === 0) {
-    list.innerHTML = '<div class="discard-empty">Belum ada kartu di tumpukan buangan.</div>';
+  const allCards = S.discardPileFull.length > 0 ? S.discardPileFull : S.discardPileTop3;
+  if (!allCards.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--cream-dim);font-size:12px">Belum ada kartu di tumpukan buangan.</div>';
     return;
   }
 
-  // allCards is ordered bottom→top from server (discardPileTop3 is also bottom→top)
-  // We reverse to show top card first
+  // Render top-first
   const reversed = [...allCards].reverse();
-
   reversed.forEach((cardStr, revIdx) => {
-    const posFromTop = revIdx; // 0 = top card
-    const { allowed, note, noteClass } = evaluateEatability(cardStr, posFromTop);
+    const posFromTop = revIdx;
+    const {allowed, note, noteClass} = evalEat(cardStr, posFromTop);
 
     const row = document.createElement('div');
-    let rowClass = 'discard-card-row';
-    if (posFromTop === 0)  rowClass += ' top-card';
-    if (allowed)           rowClass += ' eatable-card';
-    else if (state.isMyTurn && state.phase === 'DRAW') rowClass += ' blocked-card';
-    row.className = rowClass;
+    let rc = 'dc-row';
+    if (posFromTop === 0)  rc += ' top';
+    if (allowed)           rc += ' eatable';
+    else if (S.isMyTurn && S.phase === 'DRAW') rc += ' blocked';
+    row.className = rc;
 
-    const posLabel = posFromTop === 0 ? '1 ▲' : String(posFromTop + 1);
+    const posDiv = document.createElement('div');
+    posDiv.className = 'dc-pos';
+    posDiv.textContent = posFromTop === 0 ? '1▲' : String(posFromTop+1);
 
-    const cardEl = renderCardSmEl(cardStr);
+    const cardEl = makeCard(cardStr, {size:'small', extraClass:'dc-card'});
 
-    const infoDiv = document.createElement('div');
-    infoDiv.className = 'dc-info';
-
+    const info = document.createElement('div');
+    info.className = 'dc-info';
     const c = parseCard(cardStr);
-    const cardName = c.isJoker ? '🃏 Joker' : `${c.rank}${c.suit}`;
-    infoDiv.innerHTML = `
-      <div class="dc-name">${cardName} ${posFromTop === 0 ? '<span style="font-size:10px;color:var(--cream-dim);">(teratas)</span>' : ''}</div>
-      <div class="dc-note ${noteClass}">${note}</div>
-    `;
+    const cname = c.isJoker ? '🃏 Joker' : `${c.rank}${c.suit}`;
+    info.innerHTML = `<div class="dc-name">${cname}${posFromTop===0?' <span style="font-size:8px;color:var(--gold);border:1px solid var(--gold-dim);padding:1px 5px;border-radius:3px">teratas</span>':''}</div><div class="dc-note ${noteClass}">${note}</div>`;
 
-    row.appendChild(document.createElement('div')).className = 'dc-position';
-    row.querySelector('.dc-position').textContent = posLabel;
+    row.appendChild(posDiv);
     row.appendChild(cardEl);
-    row.appendChild(infoDiv);
+    row.appendChild(info);
 
     if (allowed) {
       const btn = document.createElement('button');
-      btn.className = 'dc-action';
-      btn.textContent = posFromTop === 0 ? 'Makan Atas' : 'Makan Tengah';
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        closeDiscardModal();
-        eatFromDiscard(posFromTop, cardStr);
-      };
+      btn.className = 'dc-act';
+      btn.textContent = posFromTop===0 ? 'Makan Atas' : 'Makan Tengah';
+      btn.onclick = (e) => { e.stopPropagation(); closeDiscardModal(); eatFromDiscard(posFromTop, cardStr); };
       row.appendChild(btn);
     }
-
-    list.insertBefore(row, list.firstChild);
-    list.insertBefore(row, list.firstChild); // re-insert in correct order
-  });
-
-  // Re-build cleanly
-  list.innerHTML = '';
-  reversed.forEach((cardStr, revIdx) => {
-    const posFromTop = revIdx;
-    const { allowed, note, noteClass } = evaluateEatability(cardStr, posFromTop);
-
-    const row = document.createElement('div');
-    let rowClass = 'discard-card-row';
-    if (posFromTop === 0)  rowClass += ' top-card';
-    if (allowed)           rowClass += ' eatable-card';
-    else if (state.isMyTurn && state.phase === 'DRAW') rowClass += ' blocked-card';
-    row.className = rowClass;
-
-    const posLabelDiv = document.createElement('div');
-    posLabelDiv.className = 'dc-position';
-    posLabelDiv.textContent = posFromTop === 0 ? '1▲' : String(posFromTop + 1);
-
-    const cardEl = renderCardSmEl(cardStr);
-    cardEl.className += ' dc-card';
-
-    const infoDiv = document.createElement('div');
-    infoDiv.className = 'dc-info';
-    const c = parseCard(cardStr);
-    const cardName = c.isJoker ? '🃏 Joker' : `${c.rank}${c.suit}`;
-    infoDiv.innerHTML = `
-      <div class="dc-name">${cardName}${posFromTop === 0 ? ' <span style="font-size:9px;color:var(--gold);border:1px solid var(--gold-dim);padding:1px 5px;border-radius:4px;">teratas</span>' : ''}</div>
-      <div class="dc-note ${noteClass}">${note}</div>
-    `;
-
-    row.appendChild(posLabelDiv);
-    row.appendChild(cardEl);
-    row.appendChild(infoDiv);
-
-    if (allowed) {
-      const actionBtn = document.createElement('button');
-      actionBtn.className = 'dc-action';
-      actionBtn.textContent = posFromTop === 0 ? 'Makan Atas' : 'Makan Tengah';
-      actionBtn.onclick = (e) => {
-        e.stopPropagation();
-        closeDiscardModal();
-        eatFromDiscard(posFromTop, cardStr);
-      };
-      row.appendChild(actionBtn);
-    }
-
     list.appendChild(row);
   });
 }
 
-function closeDiscardModal() {
-  document.getElementById('discardModal').classList.remove('open');
+function evalEat(cardStr, posFromTop) {
+  const isTop    = posFromTop === 0;
+  const isJokerC = cardStr.startsWith('JOKER');
+  if (!S.isMyTurn || S.phase !== 'DRAW') return {allowed:false, note:'Bukan giliranmu', noteClass:'err'};
+  if (S.maxEatDepth !== Infinity && posFromTop >= S.maxEatDepth) return {allowed:false, note:`Melebihi batas ${S.maxEatDepth} kartu teratas`, noteClass:'err'};
+  if (isJokerC && !isTop) return {allowed:false, note:'Joker tidak bisa diambil via Makan Tengah', noteClass:'err'};
+  if (!isTop && !S.myHasBaseSeries) return {allowed:false, note:'Makan Tengah butuh dasar seri', noteClass:'warn'};
+  if (isTop) return {allowed:true, note:'Makan Atas — wajib langsung dikombinasikan', noteClass:'ok'};
+  return {allowed:true, note:`Makan Tengah — ${posFromTop+1} kartu dari atas ikut diambil`, noteClass:'ok'};
 }
 
-// Close modal on backdrop click
-document.getElementById('discardModal').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('discardModal')) closeDiscardModal();
-});
+function closeDiscardModal() { document.getElementById('discardModal').classList.remove('open'); }
+document.getElementById('discardModal').addEventListener('click', e => { if (e.target===document.getElementById('discardModal')) closeDiscardModal(); });
 
-/* =====================================================
-   VOICE CHAT (WebRTC)
-   ===================================================== */
+/* =====================================================================
+   SCORE OVERLAY
+   ===================================================================== */
 
-const vcState = {
-  joined:       false,
-  muted:        false,
-  localStream:  null,
-  peers:        {},         // peerId → { pc: RTCPeerConnection, stream, speaking }
-  speakDetectors: {},       // peerId → AudioContext + analyser
-  myStream:     null,
-  speakingInterval: null,
-  myId:         myId || 'local'
-};
+let _scoreTab = 'round';
+let _isGameOver = false;
 
-// Simple signaling via the game WebSocket (piggybacked on RemiClient)
-function vcSend(payload) {
-  RemiClient.emit('vc_signal', payload);
+function openScoreHistory() {
+  _isGameOver = false;
+  buildScoreOverlay();
+  document.getElementById('scoreOverlay').classList.add('show');
 }
 
-function toggleVcMenu() {
-  const menu = document.getElementById('vcPlayersMenu');
-  menu.classList.toggle('open');
-  if (menu.classList.contains('open')) {
-    renderVcPlayers();
-  }
+function closeScoreOverlay() { document.getElementById('scoreOverlay').classList.remove('show'); }
+
+function buildScoreOverlay() {
+  document.getElementById('scoreTitle').textContent = _isGameOver ? (S.stockEmpty ? '📦 Stock Habis!' : '🏆 Permainan Selesai!') : '📊 Papan Skor';
+  document.getElementById('scoreSubtitle').textContent = _isGameOver ? (S.winnerName ? `${S.winnerName} berhasil menutup permainan!` : 'Putaran berakhir karena stock pile kosong.') : `${S.roundHistory.length} babak telah dimainkan`;
+  document.getElementById('overBtns').style.display    = _isGameOver ? 'flex' : 'none';
+  document.getElementById('closeBtnWrap').style.display = _isGameOver ? 'none' : 'block';
+  buildRoundPanel();
+  buildTotalPanel();
+  buildHistoryPanel();
+  switchScoreTab(_scoreTab);
 }
 
-// Close vc menu on outside click
-document.addEventListener('click', (e) => {
-  if (!document.getElementById('vcPanel').contains(e.target)) {
-    document.getElementById('vcPlayersMenu').classList.remove('open');
-  }
-});
-
-function renderVcPlayers() {
-  const list = document.getElementById('vcPlayersList');
-  list.innerHTML = '';
-
-  const allPlayers = [
-    { id: myId, name: 'Kamu', isMe: true },
-    ...state.opponents.map(o => ({ id: o.id, name: o.name, isMe: false }))
-  ];
-
-  allPlayers.forEach(p => {
-    const peer = vcState.peers[p.id];
-    const isMe = p.isMe;
-    let dotClass = '';
-    if (isMe && vcState.joined) {
-      dotClass = vcState.muted ? 'muted' : (vcState.speaking ? 'speaking' : '');
-    } else if (peer) {
-      dotClass = peer.speaking ? 'speaking' : '';
-    }
-
-    const row = document.createElement('div');
-    row.className = 'vc-player-row';
-    row.innerHTML = `
-      <div class="vc-player-dot ${dotClass}"></div>
-      <span>${p.name}</span>
-      ${isMe && vcState.joined ? '<span style="font-size:9px;color:var(--cream-dim);margin-left:auto;">' + (vcState.muted ? '🔇' : '🎙️') + '</span>' : ''}
-      ${!isMe && !peer ? '<span style="font-size:9px;color:var(--cream-dim);margin-left:auto;">offline VC</span>' : ''}
-    `;
-    list.appendChild(row);
+function switchScoreTab(tab) {
+  _scoreTab = tab;
+  ['round','total','history'].forEach(t => {
+    document.getElementById('tabPanel'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = t===tab?'block':'none';
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
   });
 }
 
-async function joinVoiceChat() {
-  if (vcState.joined) return;
+function buildRoundPanel() {
+  const el = document.getElementById('tabPanelRound');
+  if (!S.lastRoundScores.length) { el.innerHTML='<div style="text-align:center;padding:20px;color:var(--cream-dim);font-size:11px">Belum ada babak yang selesai.</div>'; return; }
+  const roundNum = S.roundHistory.length;
+  el.innerHTML = `<div style="font-size:10px;color:var(--cream-dim);margin-bottom:8px">Babak ${roundNum}</div>` + buildScoreTable(S.lastRoundScores, S.winner);
+}
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    vcState.localStream = stream;
-    vcState.joined      = true;
-    vcState.myStream    = stream;
+function buildTotalPanel() {
+  const el = document.getElementById('tabPanelTotal');
+  if (!Object.keys(S.totalScores).length) { el.innerHTML='<div style="text-align:center;padding:20px;color:var(--cream-dim);font-size:11px">Belum ada skor.</div>'; return; }
+  // Convert totalScores to array like roundScores
+  const rows = Object.entries(S.totalScores).map(([playerId, total]) => ({playerId, total, playerName: getPlayerName(playerId)}));
+  rows.sort((a,b) => b.total - a.total);
+  el.innerHTML = buildScoreTable(rows, null, true);
+}
 
-    // Update UI
-    const panel = document.getElementById('vcPanel');
-    panel.classList.add('vc-active');
-    document.getElementById('vcIcon').textContent  = '🎙️';
-    document.getElementById('vcLabel').textContent = 'Aktif';
-    document.getElementById('vcJoinBtn').textContent = 'Dalam Voice Chat';
-    document.getElementById('vcJoinBtn').classList.add('leave-btn');
-    document.getElementById('vcJoinBtn').onclick = leaveVoiceChat;
-    document.getElementById('vcMuteBtn').style.display = 'block';
+function buildHistoryPanel() {
+  const el = document.getElementById('tabPanelHistory');
+  if (!S.roundHistory.length) { el.innerHTML='<div style="text-align:center;padding:20px;color:var(--cream-dim);font-size:11px">Belum ada riwayat babak.</div>'; return; }
+  let html = '';
+  // Newest first
+  [...S.roundHistory].reverse().forEach(rh => {
+    const scores = rh.scores || [];
+    const totals = rh.totals || {};
+    html += `<div class="rh-section">
+      <div class="rh-header" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="rh-round">Babak ${rh.round}</span>
+        <span style="font-size:9px;color:var(--cream-dim)">klik untuk detail ▾</span>
+      </div>
+      <div class="rh-body">
+        <div style="font-size:9px;color:var(--cream-dim);padding:4px 8px 4px;margin-bottom:2px">Skor babak ini:</div>
+        ${buildScoreTable(scores, null)}
+        <div style="font-size:9px;color:var(--cream-dim);padding:4px 8px 4px;margin-bottom:2px">Total setelah babak ${rh.round}:</div>
+        ${buildScoreTable(Object.entries(totals).map(([id,t])=>({playerId:id,total:t,playerName:getPlayerName(id)})), null, true)}
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
 
-    // Notify others via WS signaling
-    vcSend({ action: 'vc_joined', fromId: myId });
-
-    // Setup speaking detection for self
-    _setupSpeakingDetector('self', stream, (speaking) => {
-      vcState.speaking = speaking;
-      renderVcPlayers();
-    });
-
-    showToast('🎙️ Voice chat aktif', false, 'info');
-    renderVcPlayers();
-
-  } catch (err) {
-    console.error('VC error:', err);
-    if (err.name === 'NotAllowedError') {
-      showToast('⚠ Izin mikrofon ditolak browser', true);
-    } else if (err.name === 'NotFoundError') {
-      showToast('⚠ Mikrofon tidak ditemukan', true);
+function buildScoreTable(scores, winnerId, isTotal=false) {
+  if (!scores || !scores.length) return '';
+  const sorted = [...scores].sort((a,b) => b.total - a.total);
+  let html = `<table class="stab"><thead><tr><th>Pemain</th>${!isTotal?'<th>Meja</th><th>Tangan</th><th>Bonus</th>':''}<th style="text-align:right">${isTotal?'Total':'Poin'}</th></tr></thead><tbody>`;
+  sorted.forEach(s => {
+    const name = s.playerId === myId ? 'Kamu' : (s.playerName || s.playerId);
+    const isW  = s.playerId === winnerId;
+    const ptsCls = s.total < 0 ? 'pts neg' : 'pts';
+    if (isTotal) {
+      html += `<tr${isW?' class="winner"':''}><td>${isW?'🏆 ':''} ${name}</td><td class="${ptsCls}">${s.total > 0 ? '+' : ''}${s.total}</td></tr>`;
     } else {
-      showToast('⚠ Gagal mengakses mikrofon', true);
+      html += `<tr${isW?' class="winner"':''}><td>${isW?'🏆 ':''}${name}</td><td>${s.tablePoints>0?'+':''}${s.tablePoints||0}</td><td>${s.handPenalty||0}</td><td>${s.bonusPoints>0?'+':''}${s.bonusPoints||0}</td><td class="${ptsCls}">${s.total > 0 ? '+' : ''}${s.total}</td></tr>`;
     }
-  }
-}
-
-function leaveVoiceChat() {
-  if (!vcState.joined) return;
-
-  // Stop all tracks
-  if (vcState.localStream) {
-    vcState.localStream.getTracks().forEach(t => t.stop());
-  }
-
-  // Close all peer connections
-  Object.values(vcState.peers).forEach(peer => {
-    if (peer.pc) peer.pc.close();
   });
-  vcState.peers      = {};
-  vcState.joined     = false;
-  vcState.muted      = false;
-  vcState.localStream = null;
-
-  // Notify others
-  vcSend({ action: 'vc_left', fromId: myId });
-
-  const panel = document.getElementById('vcPanel');
-  panel.classList.remove('vc-active', 'vc-muted');
-  document.getElementById('vcIcon').textContent  = '🎙️';
-  document.getElementById('vcLabel').textContent = 'Suara';
-  document.getElementById('vcJoinBtn').textContent = 'Gabung Suara';
-  document.getElementById('vcJoinBtn').classList.remove('leave-btn');
-  document.getElementById('vcJoinBtn').onclick = joinVoiceChat;
-  document.getElementById('vcMuteBtn').style.display = 'none';
-
-  showToast('Voice chat ditinggalkan');
-  renderVcPlayers();
-  renderOpponents();
+  html += '</tbody></table>';
+  return html;
 }
 
-function toggleMute() {
-  if (!vcState.joined || !vcState.localStream) return;
-  vcState.muted = !vcState.muted;
-  vcState.localStream.getAudioTracks().forEach(t => { t.enabled = !vcState.muted; });
-
-  const panel = document.getElementById('vcPanel');
-  panel.classList.toggle('vc-muted', vcState.muted);
-  document.getElementById('vcIcon').textContent  = vcState.muted ? '🔇' : '🎙️';
-  document.getElementById('vcLabel').textContent = vcState.muted ? 'Mute' : 'Aktif';
-  document.getElementById('vcMuteBtn').textContent = vcState.muted ? 'Aktifkan Mic' : 'Matikan Mic';
-
-  showToast(vcState.muted ? '🔇 Mikrofon dimatikan' : '🎙️ Mikrofon diaktifkan');
-  renderVcPlayers();
+function getPlayerName(playerId) {
+  if (playerId === myId) return 'Kamu';
+  const op = S.opponents.find(o => o.id === playerId);
+  return op ? op.name : playerId;
 }
 
-// ── WebRTC Peer Connection ──
-
-const RTC_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
-  ]
-};
-
-async function _createPeer(targetId, isInitiator) {
-  if (vcState.peers[targetId]) return vcState.peers[targetId].pc;
-
-  const pc = new RTCPeerConnection(RTC_CONFIG);
-  vcState.peers[targetId] = { pc, stream: null, speaking: false };
-
-  // Add local tracks
-  if (vcState.localStream) {
-    vcState.localStream.getTracks().forEach(track => pc.addTrack(track, vcState.localStream));
-  }
-
-  // Remote audio
-  pc.ontrack = (e) => {
-    const remoteStream = e.streams[0];
-    vcState.peers[targetId].stream = remoteStream;
-
-    // Play audio
-    let audioEl = document.getElementById('vc-audio-' + targetId);
-    if (!audioEl) {
-      audioEl = document.createElement('audio');
-      audioEl.id        = 'vc-audio-' + targetId;
-      audioEl.autoplay  = true;
-      audioEl.style.display = 'none';
-      document.body.appendChild(audioEl);
-    }
-    audioEl.srcObject = remoteStream;
-
-    // Speaking detection for remote peer
-    _setupSpeakingDetector(targetId, remoteStream, (speaking) => {
-      if (vcState.peers[targetId]) vcState.peers[targetId].speaking = speaking;
-      // Update speaking ring
-      const ring = document.querySelector(`.speaking-ring[data-peer="${targetId}"]`);
-      if (ring) ring.classList.toggle('active', speaking);
-      renderVcPlayers();
-    });
-  };
-
-  pc.onicecandidate = (e) => {
-    if (e.candidate) {
-      vcSend({ action: 'vc_ice', fromId: myId, toId: targetId, candidate: e.candidate });
-    }
-  };
-
-  pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-      _cleanupPeer(targetId);
-    }
-  };
-
-  if (isInitiator) {
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    vcSend({ action: 'vc_offer', fromId: myId, toId: targetId, sdp: pc.localDescription });
-  }
-
-  return pc;
+function showGameOver(data) {
+  S.lastRoundScores = (data.roundScores || []).map(rs => ({...rs, playerName: rs.playerName || getPlayerName(rs.playerId)}));
+  S.totalScores     = data.totalScores || {};
+  S.roundHistory    = data.roundHistory || S.roundHistory;
+  S.winner          = data.winner;
+  S.winnerName      = data.winnerName;
+  S.stockEmpty      = !!data.stockEmpty;
+  _isGameOver       = true;
+  _scoreTab         = 'round';
+  buildScoreOverlay();
+  document.getElementById('scoreOverlay').classList.add('show');
 }
 
-function _cleanupPeer(peerId) {
-  if (vcState.peers[peerId]) {
-    if (vcState.peers[peerId].pc) vcState.peers[peerId].pc.close();
-    delete vcState.peers[peerId];
-  }
-  const audioEl = document.getElementById('vc-audio-' + peerId);
-  if (audioEl) audioEl.remove();
-  renderVcPlayers();
-  renderOpponents();
+/* =====================================================================
+   LOBBY ACTIONS (after round over)
+   ===================================================================== */
+
+function doNextRound() {
+  // Server handles this via start_game — returns to lobby first
+  closeScoreOverlay();
+  RemiClient.emit('next_round');
+  showToast('Mengirim permintaan lanjut main...');
 }
 
-function _setupSpeakingDetector(peerId, stream, callback) {
-  try {
-    const ctx      = new (window.AudioContext || window.webkitAudioContext)();
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 256;
-    const src    = ctx.createMediaStreamSource(stream);
-    src.connect(analyser);
-    const data   = new Uint8Array(analyser.frequencyBinCount);
-    let lastState = false;
-
-    const check = setInterval(() => {
-      analyser.getByteFrequencyData(data);
-      const avg = data.reduce((a, b) => a + b, 0) / data.length;
-      const isSpeaking = avg > 15;
-      if (isSpeaking !== lastState) {
-        lastState = isSpeaking;
-        callback(isSpeaking);
-      }
-    }, 100);
-
-    vcState.speakDetectors[peerId] = { ctx, interval: check };
-  } catch (e) {
-    console.warn('Speaking detector failed:', e);
-  }
-}
-
-// ── Handle incoming VC signals via WebSocket ──
-RemiClient.on('vc_signal', async (msg) => {
-  if (!vcState.joined) return; // ignore if not in VC
-  const { action, fromId, toId, sdp, candidate } = msg;
-
-  if (toId && toId !== myId) return; // not for me
-
-  switch (action) {
-    case 'vc_joined': {
-      // Someone joined — initiate connection as the one already in VC
-      if (fromId !== myId) {
-        showToast(`🎙️ ${_peerName(fromId)} bergabung ke voice chat`, false, 'info');
-        await _createPeer(fromId, true);
-        renderVcPlayers();
-      }
-      break;
-    }
-    case 'vc_left': {
-      showToast(`${_peerName(fromId)} keluar dari voice chat`);
-      _cleanupPeer(fromId);
-      break;
-    }
-    case 'vc_offer': {
-      const pc = await _createPeer(fromId, false);
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      vcSend({ action: 'vc_answer', fromId: myId, toId: fromId, sdp: pc.localDescription });
-      break;
-    }
-    case 'vc_answer': {
-      const peer = vcState.peers[fromId];
-      if (peer && peer.pc) {
-        await peer.pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      }
-      break;
-    }
-    case 'vc_ice': {
-      const peer = vcState.peers[fromId];
-      if (peer && peer.pc && candidate) {
-        await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
-      }
-      break;
-    }
-  }
-});
-
-function _peerName(peerId) {
-  const op = state.opponents.find(o => o.id === peerId);
-  return op ? op.name : peerId;
-}
-
-/* =====================================================
-   ACTION HANDLERS
-   ===================================================== */
-
-function toggleSelect(idx) {
-  if (!state.isMyTurn || state.phase !== 'MELD') {
-    showToast('Bukan giliranmu atau bukan fase pemilihan kartu', true);
-    return;
-  }
-  if (state.selected.has(idx)) {
-    state.selected.delete(idx);
-  } else {
-    state.selected.add(idx);
-  }
-  render();
-}
-
-function drawFromStock() {
-  if (!state.isMyTurn || state.phase !== 'DRAW') return;
-  if (state.stockRemaining === 0) {
-    showToast('📦 Stock sudah habis!', true);
-    return;
-  }
-  RemiClient.drawStock();
-}
-
-function eatFromDiscard(positionFromTop, cardLabel) {
-  if (!state.isMyTurn || state.phase !== 'DRAW') {
-    showToast('Bukan giliran kamu untuk mengambil kartu', true);
-    return;
-  }
-  RemiClient.drawDiscard(positionFromTop);
-  showToast(positionFromTop === 0
-    ? `Mengambil ${cardLabel} (Makan Atas)...`
-    : `Makan Tengah: ambil ${cardLabel} + ${positionFromTop} kartu di atasnya...`
-  );
-}
-
-function attemptMeld() {
-  if (state.selected.size < 3) return;
-  const cardIds = [...state.selected].sort((a, b) => a - b).map(i => state.myHand[i]);
-  RemiClient.placeMeld(cardIds);
-  state.selected.clear();
-}
-
-function attemptDiscard() {
-  if (state.selected.size !== 1) return;
-  const idx    = [...state.selected][0];
-  const cardId = state.myHand[idx];
-  RemiClient.discardCard(cardId, false);
-  state.selected.clear();
-}
-
-function attemptClose() {
-  if (state.myHand.length !== 1 || state.selected.size !== 1) return;
-  const idx    = [...state.selected][0];
-  const cardId = state.myHand[idx];
-  if (!confirm(`Tutup game dengan kartu ${cardId}?\n\n⚠ Ingat: kamu harus sudah mengambil kartu ini dari buangan lawan (bukan dari stock).`)) return;
-  RemiClient.discardCard(cardId, true);
-  showToast(`Mencoba menutup game dengan ${cardId}!`);
+function doNewGame() {
+  closeScoreOverlay();
+  RemiClient.emit('new_game');
+  showToast('Mengirim permintaan game baru...');
 }
 
 function goToLobby() {
-  leaveVoiceChat();
   RemiClient.clearSession();
   window.location.href = 'lobby.html';
 }
 
-/* =====================================================
+/* =====================================================================
+   ACTIONS
+   ===================================================================== */
+
+function toggleSelect(idx) {
+  if (!S.isMyTurn || S.phase !== 'MELD') { showToast('Bukan giliranmu untuk memilih kartu', true); return; }
+  if (S.selected.has(idx)) S.selected.delete(idx);
+  else S.selected.add(idx);
+  render();
+}
+
+function drawFromStock() {
+  if (!S.isMyTurn || S.phase !== 'DRAW') return;
+  if (S.stockRemaining === 0) { showToast('📦 Stock sudah habis!', true); return; }
+  RemiClient.drawStock();
+}
+
+function eatFromDiscard(posFromTop, cardLabel) {
+  if (!S.isMyTurn || S.phase !== 'DRAW') { showToast('Bukan giliranmu', true); return; }
+  RemiClient.drawDiscard(posFromTop);
+  showToast(posFromTop === 0 ? `Mengambil ${cardLabel} (Makan Atas)...` : `Makan Tengah: ambil ${cardLabel} + ${posFromTop} kartu di atasnya...`);
+}
+
+function attemptMeld() {
+  if (S.selected.size < 3) return;
+  const cardIds = [...S.selected].sort((a,b)=>a-b).map(i=>S.myHand[i]);
+  RemiClient.placeMeld(cardIds);
+  S.selected.clear();
+}
+
+function attemptDiscard() {
+  if (S.selected.size !== 1) return;
+  const idx = [...S.selected][0];
+  RemiClient.discardCard(S.myHand[idx], false);
+  S.selected.clear();
+}
+
+function attemptClose() {
+  if (S.myHand.length !== 1 || S.selected.size !== 1) return;
+  const cardId = S.myHand[[...S.selected][0]];
+  if (!confirm(`Tutup game dengan kartu ${cardId}?\n\n(Kamu bebas tutup dari mana saja, asal sudah punya dasar seri dan 1 kartu tersisa)`)) return;
+  RemiClient.discardCard(cardId, true);
+  showToast(`Mencoba menutup game dengan ${cardId}!`);
+}
+
+/* =====================================================================
    TOAST
-   ===================================================== */
-function showToast(msg, isError = false, type = '') {
+   ===================================================================== */
+
+function showToast(msg, isErr=false, type='') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'toast show' + (isError ? ' error' : '') + (type === 'info' ? ' info' : '');
+  t.className = 'toast show' + (isErr?' err':'') + (type==='info'?' info':'');
   clearTimeout(window._toastTimer);
   window._toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-/* =====================================================
-   SINKRONISASI DARI SERVER
-   ===================================================== */
+/* =====================================================================
+   SERVER SYNC
+   ===================================================================== */
 
-function applyPublicSnapshot(snapshot) {
-  if (!snapshot) return;
-  state.phase           = snapshot.phase;
-  state.currentTurn     = snapshot.currentTurn;
-  state.currentTurnName = snapshot.currentTurnName || snapshot.currentTurn;
-  state.isMyTurn        = snapshot.currentTurn === myId;
-  state.stockRemaining  = snapshot.stockRemaining;
-  state.discardPileTop3 = snapshot.discardPileTop3 || [];
-  state.discardCount    = snapshot.discardCount    || state.discardPileTop3.length;
-
-  // Use extended discard pile if server sends it
-  if (snapshot.discardPileFull) {
-    state.discardPileFull = snapshot.discardPileFull;
-  } else {
-    // Fall back to top3 only
-    state.discardPileFull = state.discardPileTop3;
-  }
-
-  state.opponents = (snapshot.players || [])
-    .filter(p => p.id !== myId)
-    .map(p => ({
-      id:        p.id,
-      name:      p.name || p.id,
-      handCount: p.handCount,
-      active:    p.id === snapshot.currentTurn,
-      connected: p.connected
-    }));
-
+function applySnapshot(snap) {
+  if (!snap) return;
+  S.phase           = snap.phase;
+  S.currentTurn     = snap.currentTurn;
+  S.currentTurnName = snap.currentTurnName || snap.currentTurn;
+  S.isMyTurn        = snap.currentTurn === myId;
+  S.stockRemaining  = snap.stockRemaining;
+  S.discardPileTop3 = snap.discardPileTop3 || [];
+  S.discardPileFull = snap.discardPileFull || snap.discardPileTop3 || [];
+  S.discardCount    = snap.discardCount || S.discardPileTop3.length;
+  S.maxEatDepth     = snap.maxEatDepth !== undefined ? snap.maxEatDepth : Infinity;
+  S.opponents = (snap.players||[]).filter(p=>p.id!==myId).map(p=>({
+    id:p.id, name:p.name||p.id, handCount:p.handCount, active:p.id===snap.currentTurn, connected:p.connected
+  }));
   render();
 }
 
-RemiClient.on('state_update', (msg) => {
-  applyPublicSnapshot(msg.snapshot);
+RemiClient.on('state_update',   msg => applySnapshot(msg.snapshot));
+RemiClient.on('game_started',   msg => { applySnapshot(msg.snapshot); showToast(`Game dimulai! Giliran: ${msg.snapshot?.currentTurnName||'...'}`); });
+RemiClient.on('private_hand',   msg => {
+  S.myHand = msg.hand || []; S.myMelds = msg.melds || []; S.myHasBaseSeries = !!msg.hasBaseSeries;
+  S.selected.clear(); render();
 });
-
-RemiClient.on('game_started', (msg) => {
-  applyPublicSnapshot(msg.snapshot);
-  showToast(`Game dimulai! Giliran pertama: ${msg.snapshot?.currentTurnName || '...'}`);
+RemiClient.on('round_over',     msg => {
+  // Merge roundHistory from server if available
+  if (msg.roundHistory) S.roundHistory = msg.roundHistory;
+  showGameOver(msg);
+  S.phase = 'GAME_OVER'; updateButtons();
 });
-
-RemiClient.on('private_hand', (msg) => {
-  state.myHand          = msg.hand  || [];
-  state.myMelds         = msg.melds || [];
-  state.myHasBaseSeries = !!msg.hasBaseSeries;
-  state.selected.clear();
-  render();
-});
-
-RemiClient.on('round_over', (msg) => {
-  showGameOverOverlay(msg);
-  state.phase = 'GAME_OVER';
-  updateButtons();
-  leaveVoiceChat(); // End VC when game ends
-});
-
-RemiClient.on('error', (msg) => {
-  showToast('⚠ ' + msg.message, true);
-});
-
-RemiClient.on('disconnected', () => {
-  showToast('Koneksi putus, mencoba menyambung ulang...', true);
-});
-
-RemiClient.on('player_disconnected', (msg) => {
-  showToast(`⚠ ${msg.playerName || msg.playerId} terputus koneksi`, true);
-});
-
-RemiClient.on('player_reconnected', (msg) => {
-  showToast(`✓ ${msg.playerName || msg.playerId} kembali terhubung`);
-});
-
-RemiClient.on('reconnected', (msg) => {
+RemiClient.on('error',          msg => showToast('⚠ '+msg.message, true));
+RemiClient.on('disconnected',   ()  => showToast('Koneksi putus, mencoba sambung ulang...', true));
+RemiClient.on('player_disconnected', msg => showToast(`⚠ ${msg.playerName||msg.playerId} terputus`, true));
+RemiClient.on('player_reconnected',  msg => showToast(`✓ ${msg.playerName||msg.playerId} kembali`));
+RemiClient.on('reconnected',    msg => {
   if (msg.snapshot) {
-    applyPublicSnapshot(msg.snapshot);
-    if (msg.snapshot.myHand) {
-      state.myHand          = msg.snapshot.myHand;
-      state.myMelds         = msg.snapshot.myMelds || [];
-      state.myHasBaseSeries = !!msg.snapshot.myHasBaseSeries;
-    }
-    render();
-    showToast('Berhasil menyambung kembali!');
-  } else if (msg.room && msg.room.status === 'LOBBY') {
+    applySnapshot(msg.snapshot);
+    if (msg.snapshot.myHand) { S.myHand = msg.snapshot.myHand; S.myMelds = msg.snapshot.myMelds||[]; S.myHasBaseSeries = !!msg.snapshot.myHasBaseSeries; }
+    render(); showToast('Berhasil menyambung kembali!');
+  } else if (msg.room?.status === 'LOBBY') {
     window.location.href = 'lobby.html';
   }
 });
+// After next_round/new_game server sends game_started again
+RemiClient.on('lobby_update', () => { window.location.href='lobby.html'; });
 
-/* =====================================================
-   GAME OVER OVERLAY
-   ===================================================== */
-function showGameOverOverlay(data) {
-  const overlay = document.getElementById('overlayGameOver');
-  const title   = document.getElementById('overlayTitle');
-  const sub     = document.getElementById('overlaySubtitle');
-  const scores  = document.getElementById('overlayScores');
-  const total   = document.getElementById('overlayTotal');
-
-  if (data.stockEmpty) {
-    title.textContent = '📦 Stock Habis!';
-    sub.textContent   = 'Putaran berakhir karena stock pile kosong — skor dihitung dari kondisi saat ini.';
-  } else {
-    title.textContent = '🏆 Permainan Selesai!';
-    sub.textContent   = `${data.winnerName || data.winner} berhasil menutup permainan!`;
-  }
-
-  scores.innerHTML = '';
-  if (data.roundScores) {
-    data.roundScores.forEach(s => {
-      const li   = document.createElement('li');
-      const name = s.playerId === myId ? 'Kamu' : (s.playerName || s.playerId);
-      li.innerHTML = `<span>${name}</span><span class="pts">${s.total > 0 ? '+' : ''}${s.total}</span>`;
-      scores.appendChild(li);
-    });
-  }
-
-  total.innerHTML = '';
-  if (data.totalScores) {
-    Object.entries(data.totalScores).forEach(([id, pts]) => {
-      const li   = document.createElement('li');
-      const name = id === myId ? 'Kamu' : id;
-      li.innerHTML = `<span>${name}</span><span class="pts">${pts}</span>`;
-      total.appendChild(li);
-    });
-  }
-
-  overlay.classList.add('show');
-}
-
-/* =====================================================
-   INIT
-   ===================================================== */
 RemiClient.connect();
 render();
 </script>
-
 </body>
 </html>
