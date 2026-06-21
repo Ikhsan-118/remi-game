@@ -14,7 +14,7 @@ const RemiClient = (() => {
   // ── GANTI dengan domain server kamu setelah deploy ke Railway/Render ──
   // FIX: Pastikan format wss:// (dua slash), contoh:
   // 'wss://remi-game.up.railway.app'
-  const PRODUCTION_SERVER_URL = 'wss://GANTI-DENGAN-DOMAIN-SERVER-KAMU.up.railway.app';
+  const PRODUCTION_SERVER_URL = 'wss:remi-game.up.railway.app';
 
   const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const SERVER_URL  = isLocalhost
