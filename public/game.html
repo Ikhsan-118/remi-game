@@ -16,9 +16,11 @@
     --card-red:     #C23B3B;
     --card-black:   #1A1A1A;
     --card-face:    #FBF8F0;
-    --panel-bg:     rgba(10, 30, 24, 0.88);
+    --panel-bg:     rgba(10, 30, 24, 0.92);
     --shadow-deep:  rgba(0, 0, 0, 0.55);
     --green-ready:  #4ade80;
+    --blue-vc:      #3B82F6;
+    --blue-vc-dim:  #1D4ED8;
     --font-display: 'Source Serif Pro', Georgia, serif;
     --font-mono:    'JetBrains Mono', 'Courier New', monospace;
   }
@@ -91,15 +93,110 @@
     box-shadow: 0 0 16px rgba(212,175,55,0.25);
   }
 
+  .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
   .phase-tag {
     font-size: 10px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--cream-dim);
     text-align: right;
-    flex-shrink: 0;
   }
   .phase-tag .phase-name { color: var(--gold); display: block; font-size: 13px; margin-top: 2px; }
+
+  /* ───────── VOICE CHAT PANEL ───────── */
+  .vc-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--gold-dim);
+    background: rgba(59,130,246,0.08);
+    transition: all 0.2s ease;
+    position: relative;
+    min-width: 42px;
+  }
+  .vc-panel:hover { border-color: var(--blue-vc); background: rgba(59,130,246,0.15); }
+  .vc-panel.vc-active { border-color: var(--green-ready); background: rgba(74,222,128,0.1); }
+  .vc-panel.vc-muted  { border-color: var(--card-red); background: rgba(194,59,59,0.1); }
+  .vc-icon { font-size: 16px; line-height: 1; }
+  .vc-label { font-size: 9px; letter-spacing: 0.04em; color: var(--cream-dim); text-transform: uppercase; }
+  .vc-panel.vc-active .vc-label { color: var(--green-ready); }
+  .vc-panel.vc-muted  .vc-label { color: var(--card-red); }
+
+  /* Voice indicators around player avatars */
+  .speaking-ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--green-ready);
+    animation: speakPulse 0.8s ease-in-out infinite;
+    pointer-events: none;
+    display: none;
+  }
+  .speaking-ring.active { display: block; }
+  @keyframes speakPulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.1); }
+  }
+
+  /* VC Players list overlay */
+  .vc-players {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--panel-bg);
+    border: 1px solid var(--gold-dim);
+    border-radius: 10px;
+    padding: 10px;
+    min-width: 160px;
+    z-index: 200;
+    display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .vc-players.open { display: block; }
+  .vc-players-title { font-size: 10px; letter-spacing: 0.1em; color: var(--cream-dim); text-transform: uppercase; margin-bottom: 8px; }
+  .vc-player-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; }
+  .vc-player-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cream-dim); flex-shrink: 0; }
+  .vc-player-dot.speaking { background: var(--green-ready); box-shadow: 0 0 6px var(--green-ready); }
+  .vc-player-dot.muted    { background: var(--card-red); }
+  .vc-join-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 7px;
+    border-radius: 6px;
+    border: 1px solid var(--blue-vc);
+    background: rgba(59,130,246,0.15);
+    color: var(--blue-vc);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+  }
+  .vc-join-btn:hover { background: var(--blue-vc); color: #fff; }
+  .vc-join-btn.leave-btn { border-color: var(--card-red); color: var(--card-red); background: rgba(194,59,59,0.1); }
+  .vc-join-btn.leave-btn:hover { background: var(--card-red); color: #fff; }
+  .vc-mute-btn {
+    margin-top: 4px;
+    width: 100%;
+    padding: 7px;
+    border-radius: 6px;
+    border: 1px solid var(--gold-dim);
+    background: transparent;
+    color: var(--cream-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+  }
+  .vc-mute-btn:hover { border-color: var(--gold); color: var(--gold); }
 
   /* ───────── OPPONENTS ROW ───────── */
   .opponents-row {
@@ -118,6 +215,7 @@
     transition: opacity 0.25s ease, transform 0.25s ease;
   }
   .opponent.active-turn { opacity: 1; transform: translateY(-3px); }
+  .opponent .avatar-wrap { position: relative; }
   .opponent .avatar {
     width: 44px; height: 44px;
     border-radius: 50%;
@@ -125,6 +223,8 @@
     border: 2px solid var(--gold-dim);
     display: flex; align-items: center; justify-content: center;
     font-family: var(--font-display); font-size: 17px; color: var(--gold);
+    position: relative;
+    z-index: 1;
   }
   .opponent.active-turn .avatar { border-color: var(--gold); box-shadow: 0 0 10px rgba(212,175,55,0.4); }
   .opponent .name { font-size: 11px; color: var(--cream-dim); text-align: center; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -186,14 +286,29 @@
   }
   .stock-count { font-family: var(--font-display); font-size: 13px; color: var(--gold); }
 
-  /* Discard pile */
-  .discard-pile { position: relative; width: 110px; height: 86px; }
+  /* Discard pile — clickable to open popup */
+  .discard-pile {
+    position: relative;
+    width: 110px; height: 86px;
+    cursor: pointer;
+  }
   .discard-pile .dcard { position: absolute; width: 58px; height: 82px; transition: transform 0.2s ease; }
   .discard-pile .dcard:nth-last-child(1) { left: 26px; top: 0; z-index: 3; }
   .discard-pile .dcard:nth-last-child(2) { left: 13px; top: 2px; z-index: 2; opacity: 0.85; }
   .discard-pile .dcard:nth-last-child(3) { left: 0; top: 4px; z-index: 1; opacity: 0.65; }
-  .discard-pile .dcard.eatable { cursor: pointer; }
-  .discard-pile .dcard.eatable:hover { transform: translateY(-6px) scale(1.04); z-index: 10; }
+  .discard-pile:hover .dcard:nth-last-child(1) { transform: translateY(-4px); }
+  .discard-count-badge {
+    position: absolute;
+    top: -8px; right: -8px;
+    background: var(--gold);
+    color: #1a1a1a;
+    font-size: 10px;
+    font-weight: 700;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+  }
 
   /* ───────── PLAYING CARD ───────── */
   .pcard {
@@ -334,7 +449,6 @@
     padding: 0 8px;
   }
 
-  /* ───────── SELECTION INFO ───────── */
   .selection-info {
     text-align: center;
     font-size: 11px;
@@ -366,6 +480,177 @@
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.error { border-color: var(--card-red); color: var(--card-red); }
+  .toast.info  { border-color: var(--blue-vc); color: var(--blue-vc); }
+
+  /* ───────── DISCARD PILE POPUP ───────── */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    z-index: 150;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-backdrop.open { display: flex; }
+
+  .discard-modal {
+    background: rgba(8, 28, 22, 0.98);
+    border: 1px solid var(--gold-dim);
+    border-radius: 14px;
+    padding: 20px;
+    width: 100%;
+    max-width: 540px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  }
+
+  .discard-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .discard-modal-header h3 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--gold);
+  }
+  .discard-modal-header p {
+    font-size: 11px;
+    color: var(--cream-dim);
+    margin-top: 3px;
+    line-height: 1.5;
+  }
+  .modal-close {
+    background: none;
+    border: 1px solid var(--gold-dim);
+    color: var(--cream-dim);
+    font-size: 16px;
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+  .modal-close:hover { border-color: var(--card-red); color: var(--card-red); }
+
+  .discard-rule-box {
+    background: rgba(212,175,55,0.07);
+    border: 1px solid rgba(212,175,55,0.25);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: var(--cream-dim);
+    line-height: 1.6;
+  }
+  .discard-rule-box strong { color: var(--gold); }
+
+  .discard-cards-wrap {
+    overflow-y: auto;
+    flex: 1;
+  }
+  .discard-cards-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Each row in discard popup = one card entry */
+  .discard-card-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+  }
+  .discard-card-row.top-card {
+    border-color: var(--gold-dim);
+    background: rgba(212,175,55,0.06);
+  }
+  .discard-card-row.eatable-card {
+    cursor: pointer;
+    border-color: rgba(74,222,128,0.2);
+  }
+  .discard-card-row.eatable-card:hover {
+    border-color: var(--green-ready);
+    background: rgba(74,222,128,0.08);
+    transform: translateX(4px);
+  }
+  .discard-card-row.blocked-card {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .discard-card-row .dc-position {
+    font-size: 10px;
+    color: var(--cream-dim);
+    min-width: 24px;
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+  .discard-card-row .dc-card { flex-shrink: 0; }
+  .discard-card-row .dc-info { flex: 1; }
+  .discard-card-row .dc-info .dc-name { font-size: 13px; font-weight: 600; }
+  .discard-card-row .dc-info .dc-note { font-size: 10px; color: var(--cream-dim); margin-top: 2px; }
+  .discard-card-row .dc-info .dc-note.ok { color: var(--green-ready); }
+  .discard-card-row .dc-info .dc-note.warn { color: #F59E0B; }
+  .discard-card-row .dc-info .dc-note.err { color: var(--card-red); }
+  .discard-card-row .dc-action {
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 16px;
+    border: 1px solid var(--green-ready);
+    color: var(--green-ready);
+    background: rgba(74,222,128,0.08);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .discard-card-row .dc-action:hover { background: var(--green-ready); color: #0D3B2E; }
+
+  .discard-empty {
+    text-align: center;
+    padding: 30px;
+    color: var(--cream-dim);
+    font-size: 13px;
+  }
+
+  /* Small pcard variant for popup */
+  .pcard-sm {
+    width: 46px; height: 66px;
+    border-radius: 5px;
+    background: var(--card-face);
+    border: 1px solid rgba(0,0,0,0.15);
+    box-shadow: 0 2px 5px var(--shadow-deep);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 4px 5px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .pcard-sm.red   { color: var(--card-red); }
+  .pcard-sm.black { color: var(--card-black); }
+  .pcard-sm .rank { font-size: 13px; line-height: 1; }
+  .pcard-sm .suit { font-size: 13px; line-height: 1; align-self: flex-end; }
+  .pcard-sm.joker {
+    background: linear-gradient(135deg, var(--gold) 0%, #b8860b 100%);
+    color: #1a1a1a;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
 
   /* ───────── GAME OVER OVERLAY ───────── */
   .overlay {
@@ -416,6 +701,20 @@
   }
   .overlay-btn:hover { box-shadow: 0 0 16px rgba(212,175,55,0.4); }
 
+  /* ───────── STOCK EMPTY WARNING ───────── */
+  .stock-warning {
+    text-align: center;
+    font-size: 11px;
+    color: #F59E0B;
+    letter-spacing: 0.04em;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.3);
+    display: none;
+  }
+  .stock-warning.visible { display: block; }
+
   @media (max-width: 560px) {
     .pcard { width: 46px; height: 66px; }
     .pcard .rank, .pcard .suit { font-size: 13px; }
@@ -425,10 +724,11 @@
     .btn { padding: 9px 14px; font-size: 11px; }
     .topbar { flex-wrap: wrap; }
     .turn-indicator { font-size: 12px; }
+    .discard-modal { max-height: 90vh; padding: 14px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
+    * { transition: none !important; animation: none !important; }
   }
 </style>
 </head>
@@ -443,9 +743,23 @@
       <span class="code" id="roomCode">-----</span>
     </div>
     <div class="turn-indicator" id="turnIndicator">Memuat...</div>
-    <div class="phase-tag">
-      Fase
-      <span class="phase-name" id="phaseTag">-</span>
+    <div class="topbar-right">
+      <!-- Voice Chat -->
+      <div class="vc-panel" id="vcPanel" onclick="toggleVcMenu()">
+        <span class="vc-icon" id="vcIcon">🎙️</span>
+        <span class="vc-label" id="vcLabel">Suara</span>
+        <!-- VC dropdown -->
+        <div class="vc-players" id="vcPlayersMenu" onclick="event.stopPropagation()">
+          <div class="vc-players-title">Voice Chat</div>
+          <div id="vcPlayersList"></div>
+          <button class="vc-join-btn" id="vcJoinBtn" onclick="joinVoiceChat()">Gabung Suara</button>
+          <button class="vc-mute-btn" id="vcMuteBtn" onclick="toggleMute()" style="display:none;">Matikan Mic</button>
+        </div>
+      </div>
+      <div class="phase-tag">
+        Fase
+        <span class="phase-name" id="phaseTag">-</span>
+      </div>
     </div>
   </div>
 
@@ -456,6 +770,11 @@
 
   <!-- CENTER TABLE -->
   <div class="center-area">
+    <!-- Stock empty warning -->
+    <div class="stock-warning" id="stockWarning">
+      ⚠ Stock hampir habis — permainan akan berakhir saat stock kosong!
+    </div>
+
     <div class="piles-row">
       <div class="pile-block">
         <div class="stock-pile disabled" id="stockPile" onclick="drawFromStock()">
@@ -468,10 +787,12 @@
       </div>
 
       <div class="pile-block">
-        <div class="discard-pile" id="discardPile">
+        <!-- Clicking discard pile opens the popup -->
+        <div class="discard-pile" id="discardPile" onclick="openDiscardModal()">
           <div style="width:58px;height:82px;border:1px dashed var(--gold-dim);border-radius:6px;opacity:0.4;"></div>
+          <div class="discard-count-badge" id="discardCountBadge" style="display:none;">0</div>
         </div>
-        <span class="pile-label">Buangan</span>
+        <span class="pile-label">Buangan <span style="color:var(--gold);font-size:9px;">(klik lihat semua)</span></span>
       </div>
     </div>
   </div>
@@ -499,7 +820,33 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- GAME OVER OVERLAY -->
+<!-- ═══════ DISCARD PILE MODAL ═══════ -->
+<div class="modal-backdrop" id="discardModal">
+  <div class="discard-modal">
+    <div class="discard-modal-header">
+      <div>
+        <h3>🗂 Tumpukan Buangan</h3>
+        <p id="discardModalSubtitle">Kartu paling atas (posisi 1) bisa langsung diambil jika bisa dikombinasikan.</p>
+      </div>
+      <button class="modal-close" onclick="closeDiscardModal()">✕</button>
+    </div>
+
+    <div class="discard-rule-box" id="discardRuleBox">
+      <strong>Aturan Ambil Buangan:</strong><br>
+      • <strong>Makan Atas (Rel):</strong> Ambil kartu teratas — wajib langsung bisa dikombinasikan dengan min. 2 kartu di tangan.<br>
+      • <strong>Makan Tengah:</strong> Hanya boleh jika sudah punya <strong>dasar seri</strong>. Semua kartu di atasnya ikut diambil.<br>
+      • <strong>Joker</strong> di tumpukan tidak bisa diambil via Makan Tengah.
+    </div>
+
+    <div class="discard-cards-wrap">
+      <div class="discard-cards-grid" id="discardCardsList">
+        <div class="discard-empty">Belum ada kartu di tumpukan buangan.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ GAME OVER OVERLAY ═══════ -->
 <div class="overlay" id="overlayGameOver">
   <div class="overlay-box">
     <h2 id="overlayTitle">🏁 Putaran Selesai</h2>
@@ -533,31 +880,27 @@ let myName = '';
    STATE — disinkronkan dari server
    ===================================================== */
 let state = {
-  phase:           'DRAW',
-  currentTurn:     '',      // ID pemain yang giliran
-  currentTurnName: '',      // NAMA pemain yang giliran (FIX)
-  isMyTurn:        false,
-  stockRemaining:  0,
-  discardPileTop3: [],
-  opponents:       [],      // { id, name, handCount, active, connected }
-  myHand:          [],
-  myMelds:         [],
-  myHasBaseSeries: false,
-  selected:        new Set()
+  phase:            'DRAW',
+  currentTurn:      '',
+  currentTurnName:  '',
+  isMyTurn:         false,
+  stockRemaining:   0,
+  discardPileTop3:  [],
+  discardPileFull:  [],  // full discard pile dari server (jika tersedia)
+  discardCount:     0,
+  opponents:        [],
+  myHand:           [],
+  myMelds:          [],
+  myHasBaseSeries:  false,
+  selected:         new Set()
 };
 
 /* =====================================================
    PARSE & RENDER KARTU
    ===================================================== */
-
-/**
- * Parse string kartu: "7♠", "K♥", "JOKER_1", dll.
- * FIX: handle format JOKER_1 dan JOKER_2
- */
 function parseCard(str) {
   if (!str) return null;
   if (str.startsWith('JOKER')) return { rank: 'JOKER', suit: null, isJoker: true, id: str };
-  // Format: "10♠", "K♥", "A♦", dll.
   const suit = str.slice(-1);
   const rank = str.slice(0, -1);
   return { rank, suit, isJoker: false, id: str };
@@ -566,12 +909,30 @@ function parseCard(str) {
 function renderCardEl(cardStr, opts = {}) {
   const c = parseCard(cardStr);
   if (!c) return document.createElement('div');
-
   const el = document.createElement('div');
   el.className = 'pcard ' + (c.isJoker ? 'joker' : (SUIT_COLOR[c.suit] || 'black'));
   if (opts.extraClass) el.className += ' ' + opts.extraClass;
   el.dataset.cardId = cardStr;
+  if (c.isJoker) {
+    el.textContent = '🃏';
+  } else {
+    const rankEl = document.createElement('div');
+    rankEl.className = 'rank';
+    rankEl.textContent = c.rank;
+    const suitEl = document.createElement('div');
+    suitEl.className = 'suit';
+    suitEl.textContent = c.suit;
+    el.appendChild(rankEl);
+    el.appendChild(suitEl);
+  }
+  return el;
+}
 
+function renderCardSmEl(cardStr) {
+  const c = parseCard(cardStr);
+  if (!c) return document.createElement('div');
+  const el = document.createElement('div');
+  el.className = 'pcard-sm ' + (c.isJoker ? 'joker' : (SUIT_COLOR[c.suit] || 'black'));
   if (c.isJoker) {
     el.textContent = '🃏';
   } else {
@@ -590,13 +951,10 @@ function renderCardEl(cardStr, opts = {}) {
 /* =====================================================
    RENDER UTAMA
    ===================================================== */
-
 function render() {
-  // TOP BAR
   const roomCode = RemiClient.getSession().roomCode || '-----';
   document.getElementById('roomCode').textContent = roomCode;
 
-  // FIX: Tampilkan NAMA pemain, bukan ID
   const turnName = state.isMyTurn ? 'Giliranmu!' : `Giliran: ${state.currentTurnName || '...'}`;
   const turnEl = document.getElementById('turnIndicator');
   turnEl.textContent = turnName;
@@ -604,51 +962,66 @@ function render() {
 
   document.getElementById('phaseTag').textContent = PHASE_LABELS[state.phase] || state.phase;
 
-  // OPPONENTS
   renderOpponents();
 
   // STOCK
-  document.getElementById('stockCount').textContent = state.stockRemaining + ' kartu';
-  const stockEl = document.getElementById('stockPile');
-  const canDraw = state.isMyTurn && state.phase === 'DRAW' && state.stockRemaining > 0;
+  const stockEl  = document.getElementById('stockPile');
+  const stockNum = state.stockRemaining;
+  document.getElementById('stockCount').textContent = stockNum + ' kartu';
+  const canDraw = state.isMyTurn && state.phase === 'DRAW' && stockNum > 0;
   stockEl.classList.toggle('disabled', !canDraw);
 
-  // DISCARD PILE
-  renderDiscardPile();
+  // Stock warning
+  const warn = document.getElementById('stockWarning');
+  if (stockNum > 0 && stockNum <= 5) {
+    warn.classList.add('visible');
+    warn.textContent = `⚠ Stock tersisa ${stockNum} kartu — permainan hampir berakhir!`;
+  } else if (stockNum === 0) {
+    warn.classList.add('visible');
+    warn.textContent = '📦 Stock habis — permainan berakhir setelah giliran ini!';
+  } else {
+    warn.classList.remove('visible');
+  }
 
-  // MY MELDS
+  // DISCARD PILE preview (top 3)
+  renderDiscardPilePreview();
+
+  // DISCARD COUNT BADGE
+  const badge = document.getElementById('discardCountBadge');
+  if (state.discardCount > 0) {
+    badge.style.display = 'flex';
+    badge.textContent   = state.discardCount;
+  } else {
+    badge.style.display = 'none';
+  }
+
   renderMyMelds();
-
-  // MY HAND
   renderMyHand();
-
-  // BUTTONS
   updateButtons();
-
-  // HINT
   document.getElementById('hintText').textContent = getHint();
 }
 
 function renderOpponents() {
   const row = document.getElementById('opponentsRow');
   row.innerHTML = '';
-
   if (!state.opponents || state.opponents.length === 0) {
     row.innerHTML = '<div style="font-size:12px;color:var(--cream-dim);">-</div>';
     return;
   }
-
   state.opponents.forEach(op => {
     const div = document.createElement('div');
     div.className = 'opponent' + (op.active ? ' active-turn' : '');
-
-    // FIX: Gunakan nama (op.name), bukan op.id
-    const initials = (op.name || op.id || '?').slice(0, 2).toUpperCase();
-    const displayName = op.name || op.id || '?';
-    const cardCount = Math.min(op.handCount, 12);
+    const initials     = (op.name || op.id || '?').slice(0, 2).toUpperCase();
+    const displayName  = op.name || op.id || '?';
+    const cardCount    = Math.min(op.handCount, 12);
+    const vcStatus     = vcState.peers[op.id];
+    const speakingClass = (vcStatus && vcStatus.speaking) ? 'active' : '';
 
     div.innerHTML = `
-      <div class="avatar">${initials}</div>
+      <div class="avatar-wrap">
+        <div class="avatar">${initials}</div>
+        <div class="speaking-ring ${speakingClass}" data-peer="${op.id}"></div>
+      </div>
       <div class="name" title="${displayName}">${displayName}</div>
       <div class="hand-mini">
         ${'<div class="mini-card"></div>'.repeat(cardCount)}
@@ -660,37 +1033,28 @@ function renderOpponents() {
   });
 }
 
-function renderDiscardPile() {
+function renderDiscardPilePreview() {
   const dPile = document.getElementById('discardPile');
-  dPile.innerHTML = '';
+  // Remove existing card elements but keep badge
+  Array.from(dPile.querySelectorAll('.dcard')).forEach(el => el.remove());
 
   if (!state.discardPileTop3 || state.discardPileTop3.length === 0) {
     const empty = document.createElement('div');
     empty.style.cssText = 'width:58px;height:82px;border:1px dashed var(--gold-dim);border-radius:6px;opacity:0.4;';
-    dPile.appendChild(empty);
+    dPile.insertBefore(empty, dPile.firstChild);
     return;
   }
 
-  const canEat = state.isMyTurn && state.phase === 'DRAW';
-
-  state.discardPileTop3.forEach((c, i) => {
-    const el = renderCardEl(c, { extraClass: 'dcard' + (canEat ? ' eatable' : '') });
-    if (canEat) {
-      // positionFromTop: kartu paling akhir di array = paling atas = posisi 0
-      const posFromTop = state.discardPileTop3.length - 1 - i;
-      el.onclick = () => eatFromDiscard(posFromTop, c);
-      el.title = posFromTop === 0 ? 'Klik untuk makan kartu ini' : `Makan tengah (posisi ${posFromTop})`;
-    }
-    dPile.appendChild(el);
+  state.discardPileTop3.forEach(c => {
+    const el = renderCardEl(c, { extraClass: 'dcard' });
+    dPile.insertBefore(el, dPile.firstChild);
   });
 }
 
 function renderMyMelds() {
   const meldsWrap = document.getElementById('myMelds');
   meldsWrap.innerHTML = '';
-
   if (!state.myMelds || state.myMelds.length === 0) return;
-
   state.myMelds.forEach(meld => {
     if (!meld || !meld.length) return;
     const group = document.createElement('div');
@@ -703,12 +1067,10 @@ function renderMyMelds() {
 function renderMyHand() {
   const handRow = document.getElementById('handRow');
   handRow.innerHTML = '';
-
   if (!state.myHand || state.myHand.length === 0) {
     handRow.innerHTML = '<div style="font-size:12px;color:var(--cream-dim);padding:8px;">Tangan kosong</div>';
     return;
   }
-
   state.myHand.forEach((c, idx) => {
     const selected = state.selected.has(idx);
     const el = renderCardEl(c, { extraClass: 'in-hand' + (selected ? ' selected' : '') });
@@ -716,8 +1078,6 @@ function renderMyHand() {
     el.title = c + (selected ? ' (dipilih)' : '');
     handRow.appendChild(el);
   });
-
-  // Tampilkan info seleksi
   const selInfo = document.getElementById('selectionInfo');
   if (state.selected.size > 0) {
     const selectedCards = [...state.selected].map(i => state.myHand[i]).join(', ');
@@ -728,19 +1088,13 @@ function renderMyHand() {
 }
 
 function updateButtons() {
-  const myTurn   = state.isMyTurn;
-  const isMeld   = state.phase === 'MELD';
-  const sel      = state.selected.size;
-  const handLen  = state.myHand.length;
+  const myTurn  = state.isMyTurn;
+  const isMeld  = state.phase === 'MELD';
+  const sel     = state.selected.size;
+  const handLen = state.myHand.length;
 
-  // Turun Seri: giliran saya, fase MELD, pilih ≥3 kartu
   setBtnEnabled('btnMeld',    myTurn && isMeld && sel >= 3);
-
-  // Buang Kartu: giliran saya, fase MELD, pilih tepat 1 kartu
   setBtnEnabled('btnDiscard', myTurn && isMeld && sel === 1);
-
-  // Tutup Game: giliran saya, fase MELD, sisa 1 kartu di tangan, pilih 1 kartu
-  // dan sudah punya dasar seri
   setBtnEnabled('btnClose',
     myTurn && isMeld && handLen === 1 && sel === 1 && state.myHasBaseSeries
   );
@@ -753,9 +1107,8 @@ function setBtnEnabled(id, enabled) {
 function getHint() {
   if (state.phase === 'GAME_OVER') return '🏁 Permainan selesai.';
   if (!state.isMyTurn) return `Menunggu giliran ${state.currentTurnName || '...'}...`;
-
   if (state.phase === 'DRAW') {
-    return 'Klik stock (kiri) untuk ambil kartu, atau klik kartu buangan untuk "makan".';
+    return 'Ambil kartu dari Stock, atau klik tumpukan Buangan untuk lihat semua & pilih yang mau diambil.';
   }
   if (state.phase === 'MELD') {
     const sel = state.selected.size;
@@ -766,15 +1119,511 @@ function getHint() {
     }
     if (sel === 1) {
       return state.myHand.length === 1 && state.myHasBaseSeries
-        ? 'Klik "Tutup Game" untuk menutup permainan, atau "Buang Kartu" untuk buang biasa.'
+        ? 'Klik "Tutup Game" untuk menutup permainan.'
         : 'Klik "Buang Kartu" untuk mengakhiri giliran.';
     }
-    if (sel >= 3) {
-      return `${sel} kartu dipilih — klik "Turun Seri" untuk meletakkan kombinasi.`;
-    }
+    if (sel >= 3) return `${sel} kartu dipilih — klik "Turun Seri" untuk meletakkan kombinasi.`;
     return `${sel} kartu dipilih.`;
   }
   return '';
+}
+
+/* =====================================================
+   DISCARD PILE MODAL
+   ===================================================== */
+
+/**
+ * Evaluate whether a card at `posFromTop` in the discard pile
+ * is eat-able given current state. Returns { allowed, note, noteClass }
+ */
+function evaluateEatability(cardStr, posFromTop) {
+  const isTop     = posFromTop === 0;
+  const isJoker   = cardStr.startsWith('JOKER');
+  const hasSeries = state.myHasBaseSeries;
+
+  // Not your turn / wrong phase
+  if (!state.isMyTurn || state.phase !== 'DRAW') {
+    return { allowed: false, note: 'Bukan giliran kamu', noteClass: 'err' };
+  }
+
+  // Joker in middle
+  if (isJoker && !isTop) {
+    return { allowed: false, note: 'Joker tidak bisa diambil via Makan Tengah', noteClass: 'err' };
+  }
+
+  // Middle card requires base series
+  if (!isTop && !hasSeries) {
+    return { allowed: false, note: 'Makan Tengah butuh dasar seri dulu', noteClass: 'warn' };
+  }
+
+  if (isTop) {
+    return {
+      allowed: true,
+      note: 'Makan Atas — wajib langsung dikombinasikan',
+      noteClass: 'ok'
+    };
+  }
+
+  // Middle: allowed (server will do final combo check)
+  const posLabel = posFromTop + 1;
+  return {
+    allowed: true,
+    note: `Makan Tengah — ${posLabel} kartu dari atas ikut diambil`,
+    noteClass: 'ok'
+  };
+}
+
+function openDiscardModal() {
+  const modal = document.getElementById('discardModal');
+  modal.classList.add('open');
+
+  const list      = document.getElementById('discardCardsList');
+  const subtitle  = document.getElementById('discardModalSubtitle');
+  const ruleBox   = document.getElementById('discardRuleBox');
+
+  // Show different rule context depending on turn / baseSeries
+  if (!state.isMyTurn || state.phase !== 'DRAW') {
+    subtitle.textContent  = 'Hanya bisa mengambil saat giliran kamu di fase Ambil Kartu.';
+    ruleBox.style.display = 'block';
+  } else {
+    subtitle.textContent  = state.myHasBaseSeries
+      ? 'Kamu sudah punya dasar seri — bisa Makan Atas atau Makan Tengah.'
+      : 'Kamu belum punya dasar seri — hanya bisa Makan Atas (kartu paling atas).';
+    ruleBox.style.display = 'block';
+  }
+
+  // Build the full list from discardPileFull if available, otherwise top3
+  const allCards = state.discardPileFull.length > 0
+    ? state.discardPileFull
+    : state.discardPileTop3;
+
+  list.innerHTML = '';
+
+  if (!allCards || allCards.length === 0) {
+    list.innerHTML = '<div class="discard-empty">Belum ada kartu di tumpukan buangan.</div>';
+    return;
+  }
+
+  // allCards is ordered bottom→top from server (discardPileTop3 is also bottom→top)
+  // We reverse to show top card first
+  const reversed = [...allCards].reverse();
+
+  reversed.forEach((cardStr, revIdx) => {
+    const posFromTop = revIdx; // 0 = top card
+    const { allowed, note, noteClass } = evaluateEatability(cardStr, posFromTop);
+
+    const row = document.createElement('div');
+    let rowClass = 'discard-card-row';
+    if (posFromTop === 0)  rowClass += ' top-card';
+    if (allowed)           rowClass += ' eatable-card';
+    else if (state.isMyTurn && state.phase === 'DRAW') rowClass += ' blocked-card';
+    row.className = rowClass;
+
+    const posLabel = posFromTop === 0 ? '1 ▲' : String(posFromTop + 1);
+
+    const cardEl = renderCardSmEl(cardStr);
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'dc-info';
+
+    const c = parseCard(cardStr);
+    const cardName = c.isJoker ? '🃏 Joker' : `${c.rank}${c.suit}`;
+    infoDiv.innerHTML = `
+      <div class="dc-name">${cardName} ${posFromTop === 0 ? '<span style="font-size:10px;color:var(--cream-dim);">(teratas)</span>' : ''}</div>
+      <div class="dc-note ${noteClass}">${note}</div>
+    `;
+
+    row.appendChild(document.createElement('div')).className = 'dc-position';
+    row.querySelector('.dc-position').textContent = posLabel;
+    row.appendChild(cardEl);
+    row.appendChild(infoDiv);
+
+    if (allowed) {
+      const btn = document.createElement('button');
+      btn.className = 'dc-action';
+      btn.textContent = posFromTop === 0 ? 'Makan Atas' : 'Makan Tengah';
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        closeDiscardModal();
+        eatFromDiscard(posFromTop, cardStr);
+      };
+      row.appendChild(btn);
+    }
+
+    list.insertBefore(row, list.firstChild);
+    list.insertBefore(row, list.firstChild); // re-insert in correct order
+  });
+
+  // Re-build cleanly
+  list.innerHTML = '';
+  reversed.forEach((cardStr, revIdx) => {
+    const posFromTop = revIdx;
+    const { allowed, note, noteClass } = evaluateEatability(cardStr, posFromTop);
+
+    const row = document.createElement('div');
+    let rowClass = 'discard-card-row';
+    if (posFromTop === 0)  rowClass += ' top-card';
+    if (allowed)           rowClass += ' eatable-card';
+    else if (state.isMyTurn && state.phase === 'DRAW') rowClass += ' blocked-card';
+    row.className = rowClass;
+
+    const posLabelDiv = document.createElement('div');
+    posLabelDiv.className = 'dc-position';
+    posLabelDiv.textContent = posFromTop === 0 ? '1▲' : String(posFromTop + 1);
+
+    const cardEl = renderCardSmEl(cardStr);
+    cardEl.className += ' dc-card';
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'dc-info';
+    const c = parseCard(cardStr);
+    const cardName = c.isJoker ? '🃏 Joker' : `${c.rank}${c.suit}`;
+    infoDiv.innerHTML = `
+      <div class="dc-name">${cardName}${posFromTop === 0 ? ' <span style="font-size:9px;color:var(--gold);border:1px solid var(--gold-dim);padding:1px 5px;border-radius:4px;">teratas</span>' : ''}</div>
+      <div class="dc-note ${noteClass}">${note}</div>
+    `;
+
+    row.appendChild(posLabelDiv);
+    row.appendChild(cardEl);
+    row.appendChild(infoDiv);
+
+    if (allowed) {
+      const actionBtn = document.createElement('button');
+      actionBtn.className = 'dc-action';
+      actionBtn.textContent = posFromTop === 0 ? 'Makan Atas' : 'Makan Tengah';
+      actionBtn.onclick = (e) => {
+        e.stopPropagation();
+        closeDiscardModal();
+        eatFromDiscard(posFromTop, cardStr);
+      };
+      row.appendChild(actionBtn);
+    }
+
+    list.appendChild(row);
+  });
+}
+
+function closeDiscardModal() {
+  document.getElementById('discardModal').classList.remove('open');
+}
+
+// Close modal on backdrop click
+document.getElementById('discardModal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('discardModal')) closeDiscardModal();
+});
+
+/* =====================================================
+   VOICE CHAT (WebRTC)
+   ===================================================== */
+
+const vcState = {
+  joined:       false,
+  muted:        false,
+  localStream:  null,
+  peers:        {},         // peerId → { pc: RTCPeerConnection, stream, speaking }
+  speakDetectors: {},       // peerId → AudioContext + analyser
+  myStream:     null,
+  speakingInterval: null,
+  myId:         myId || 'local'
+};
+
+// Simple signaling via the game WebSocket (piggybacked on RemiClient)
+function vcSend(payload) {
+  RemiClient.emit('vc_signal', payload);
+}
+
+function toggleVcMenu() {
+  const menu = document.getElementById('vcPlayersMenu');
+  menu.classList.toggle('open');
+  if (menu.classList.contains('open')) {
+    renderVcPlayers();
+  }
+}
+
+// Close vc menu on outside click
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('vcPanel').contains(e.target)) {
+    document.getElementById('vcPlayersMenu').classList.remove('open');
+  }
+});
+
+function renderVcPlayers() {
+  const list = document.getElementById('vcPlayersList');
+  list.innerHTML = '';
+
+  const allPlayers = [
+    { id: myId, name: 'Kamu', isMe: true },
+    ...state.opponents.map(o => ({ id: o.id, name: o.name, isMe: false }))
+  ];
+
+  allPlayers.forEach(p => {
+    const peer = vcState.peers[p.id];
+    const isMe = p.isMe;
+    let dotClass = '';
+    if (isMe && vcState.joined) {
+      dotClass = vcState.muted ? 'muted' : (vcState.speaking ? 'speaking' : '');
+    } else if (peer) {
+      dotClass = peer.speaking ? 'speaking' : '';
+    }
+
+    const row = document.createElement('div');
+    row.className = 'vc-player-row';
+    row.innerHTML = `
+      <div class="vc-player-dot ${dotClass}"></div>
+      <span>${p.name}</span>
+      ${isMe && vcState.joined ? '<span style="font-size:9px;color:var(--cream-dim);margin-left:auto;">' + (vcState.muted ? '🔇' : '🎙️') + '</span>' : ''}
+      ${!isMe && !peer ? '<span style="font-size:9px;color:var(--cream-dim);margin-left:auto;">offline VC</span>' : ''}
+    `;
+    list.appendChild(row);
+  });
+}
+
+async function joinVoiceChat() {
+  if (vcState.joined) return;
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    vcState.localStream = stream;
+    vcState.joined      = true;
+    vcState.myStream    = stream;
+
+    // Update UI
+    const panel = document.getElementById('vcPanel');
+    panel.classList.add('vc-active');
+    document.getElementById('vcIcon').textContent  = '🎙️';
+    document.getElementById('vcLabel').textContent = 'Aktif';
+    document.getElementById('vcJoinBtn').textContent = 'Dalam Voice Chat';
+    document.getElementById('vcJoinBtn').classList.add('leave-btn');
+    document.getElementById('vcJoinBtn').onclick = leaveVoiceChat;
+    document.getElementById('vcMuteBtn').style.display = 'block';
+
+    // Notify others via WS signaling
+    vcSend({ action: 'vc_joined', fromId: myId });
+
+    // Setup speaking detection for self
+    _setupSpeakingDetector('self', stream, (speaking) => {
+      vcState.speaking = speaking;
+      renderVcPlayers();
+    });
+
+    showToast('🎙️ Voice chat aktif', false, 'info');
+    renderVcPlayers();
+
+  } catch (err) {
+    console.error('VC error:', err);
+    if (err.name === 'NotAllowedError') {
+      showToast('⚠ Izin mikrofon ditolak browser', true);
+    } else if (err.name === 'NotFoundError') {
+      showToast('⚠ Mikrofon tidak ditemukan', true);
+    } else {
+      showToast('⚠ Gagal mengakses mikrofon', true);
+    }
+  }
+}
+
+function leaveVoiceChat() {
+  if (!vcState.joined) return;
+
+  // Stop all tracks
+  if (vcState.localStream) {
+    vcState.localStream.getTracks().forEach(t => t.stop());
+  }
+
+  // Close all peer connections
+  Object.values(vcState.peers).forEach(peer => {
+    if (peer.pc) peer.pc.close();
+  });
+  vcState.peers      = {};
+  vcState.joined     = false;
+  vcState.muted      = false;
+  vcState.localStream = null;
+
+  // Notify others
+  vcSend({ action: 'vc_left', fromId: myId });
+
+  const panel = document.getElementById('vcPanel');
+  panel.classList.remove('vc-active', 'vc-muted');
+  document.getElementById('vcIcon').textContent  = '🎙️';
+  document.getElementById('vcLabel').textContent = 'Suara';
+  document.getElementById('vcJoinBtn').textContent = 'Gabung Suara';
+  document.getElementById('vcJoinBtn').classList.remove('leave-btn');
+  document.getElementById('vcJoinBtn').onclick = joinVoiceChat;
+  document.getElementById('vcMuteBtn').style.display = 'none';
+
+  showToast('Voice chat ditinggalkan');
+  renderVcPlayers();
+  renderOpponents();
+}
+
+function toggleMute() {
+  if (!vcState.joined || !vcState.localStream) return;
+  vcState.muted = !vcState.muted;
+  vcState.localStream.getAudioTracks().forEach(t => { t.enabled = !vcState.muted; });
+
+  const panel = document.getElementById('vcPanel');
+  panel.classList.toggle('vc-muted', vcState.muted);
+  document.getElementById('vcIcon').textContent  = vcState.muted ? '🔇' : '🎙️';
+  document.getElementById('vcLabel').textContent = vcState.muted ? 'Mute' : 'Aktif';
+  document.getElementById('vcMuteBtn').textContent = vcState.muted ? 'Aktifkan Mic' : 'Matikan Mic';
+
+  showToast(vcState.muted ? '🔇 Mikrofon dimatikan' : '🎙️ Mikrofon diaktifkan');
+  renderVcPlayers();
+}
+
+// ── WebRTC Peer Connection ──
+
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ]
+};
+
+async function _createPeer(targetId, isInitiator) {
+  if (vcState.peers[targetId]) return vcState.peers[targetId].pc;
+
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  vcState.peers[targetId] = { pc, stream: null, speaking: false };
+
+  // Add local tracks
+  if (vcState.localStream) {
+    vcState.localStream.getTracks().forEach(track => pc.addTrack(track, vcState.localStream));
+  }
+
+  // Remote audio
+  pc.ontrack = (e) => {
+    const remoteStream = e.streams[0];
+    vcState.peers[targetId].stream = remoteStream;
+
+    // Play audio
+    let audioEl = document.getElementById('vc-audio-' + targetId);
+    if (!audioEl) {
+      audioEl = document.createElement('audio');
+      audioEl.id        = 'vc-audio-' + targetId;
+      audioEl.autoplay  = true;
+      audioEl.style.display = 'none';
+      document.body.appendChild(audioEl);
+    }
+    audioEl.srcObject = remoteStream;
+
+    // Speaking detection for remote peer
+    _setupSpeakingDetector(targetId, remoteStream, (speaking) => {
+      if (vcState.peers[targetId]) vcState.peers[targetId].speaking = speaking;
+      // Update speaking ring
+      const ring = document.querySelector(`.speaking-ring[data-peer="${targetId}"]`);
+      if (ring) ring.classList.toggle('active', speaking);
+      renderVcPlayers();
+    });
+  };
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      vcSend({ action: 'vc_ice', fromId: myId, toId: targetId, candidate: e.candidate });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      _cleanupPeer(targetId);
+    }
+  };
+
+  if (isInitiator) {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    vcSend({ action: 'vc_offer', fromId: myId, toId: targetId, sdp: pc.localDescription });
+  }
+
+  return pc;
+}
+
+function _cleanupPeer(peerId) {
+  if (vcState.peers[peerId]) {
+    if (vcState.peers[peerId].pc) vcState.peers[peerId].pc.close();
+    delete vcState.peers[peerId];
+  }
+  const audioEl = document.getElementById('vc-audio-' + peerId);
+  if (audioEl) audioEl.remove();
+  renderVcPlayers();
+  renderOpponents();
+}
+
+function _setupSpeakingDetector(peerId, stream, callback) {
+  try {
+    const ctx      = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    const src    = ctx.createMediaStreamSource(stream);
+    src.connect(analyser);
+    const data   = new Uint8Array(analyser.frequencyBinCount);
+    let lastState = false;
+
+    const check = setInterval(() => {
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length;
+      const isSpeaking = avg > 15;
+      if (isSpeaking !== lastState) {
+        lastState = isSpeaking;
+        callback(isSpeaking);
+      }
+    }, 100);
+
+    vcState.speakDetectors[peerId] = { ctx, interval: check };
+  } catch (e) {
+    console.warn('Speaking detector failed:', e);
+  }
+}
+
+// ── Handle incoming VC signals via WebSocket ──
+RemiClient.on('vc_signal', async (msg) => {
+  if (!vcState.joined) return; // ignore if not in VC
+  const { action, fromId, toId, sdp, candidate } = msg;
+
+  if (toId && toId !== myId) return; // not for me
+
+  switch (action) {
+    case 'vc_joined': {
+      // Someone joined — initiate connection as the one already in VC
+      if (fromId !== myId) {
+        showToast(`🎙️ ${_peerName(fromId)} bergabung ke voice chat`, false, 'info');
+        await _createPeer(fromId, true);
+        renderVcPlayers();
+      }
+      break;
+    }
+    case 'vc_left': {
+      showToast(`${_peerName(fromId)} keluar dari voice chat`);
+      _cleanupPeer(fromId);
+      break;
+    }
+    case 'vc_offer': {
+      const pc = await _createPeer(fromId, false);
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      vcSend({ action: 'vc_answer', fromId: myId, toId: fromId, sdp: pc.localDescription });
+      break;
+    }
+    case 'vc_answer': {
+      const peer = vcState.peers[fromId];
+      if (peer && peer.pc) {
+        await peer.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      }
+      break;
+    }
+    case 'vc_ice': {
+      const peer = vcState.peers[fromId];
+      if (peer && peer.pc && candidate) {
+        await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+      break;
+    }
+  }
+});
+
+function _peerName(peerId) {
+  const op = state.opponents.find(o => o.id === peerId);
+  return op ? op.name : peerId;
 }
 
 /* =====================================================
@@ -797,16 +1646,22 @@ function toggleSelect(idx) {
 function drawFromStock() {
   if (!state.isMyTurn || state.phase !== 'DRAW') return;
   if (state.stockRemaining === 0) {
-    showToast('Stock pile sudah habis!', true);
+    showToast('📦 Stock sudah habis!', true);
     return;
   }
   RemiClient.drawStock();
 }
 
 function eatFromDiscard(positionFromTop, cardLabel) {
-  if (!state.isMyTurn || state.phase !== 'DRAW') return;
+  if (!state.isMyTurn || state.phase !== 'DRAW') {
+    showToast('Bukan giliran kamu untuk mengambil kartu', true);
+    return;
+  }
   RemiClient.drawDiscard(positionFromTop);
-  showToast(`Mengambil ${cardLabel} dari buangan...`);
+  showToast(positionFromTop === 0
+    ? `Mengambil ${cardLabel} (Makan Atas)...`
+    : `Makan Tengah: ambil ${cardLabel} + ${positionFromTop} kartu di atasnya...`
+  );
 }
 
 function attemptMeld() {
@@ -828,15 +1683,13 @@ function attemptClose() {
   if (state.myHand.length !== 1 || state.selected.size !== 1) return;
   const idx    = [...state.selected][0];
   const cardId = state.myHand[idx];
-
-  if (!confirm(`Tutup game dengan kartu ${cardId}?\n(Pastikan kamu ambil kartu ini dari buangan lawan)`)) {
-    return;
-  }
+  if (!confirm(`Tutup game dengan kartu ${cardId}?\n\n⚠ Ingat: kamu harus sudah mengambil kartu ini dari buangan lawan (bukan dari stock).`)) return;
   RemiClient.discardCard(cardId, true);
   showToast(`Mencoba menutup game dengan ${cardId}!`);
 }
 
 function goToLobby() {
+  leaveVoiceChat();
   RemiClient.clearSession();
   window.location.href = 'lobby.html';
 }
@@ -844,39 +1697,41 @@ function goToLobby() {
 /* =====================================================
    TOAST
    ===================================================== */
-function showToast(msg, isError = false) {
+function showToast(msg, isError = false, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'toast show' + (isError ? ' error' : '');
+  t.className = 'toast show' + (isError ? ' error' : '') + (type === 'info' ? ' info' : '');
   clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
 /* =====================================================
    SINKRONISASI DARI SERVER
    ===================================================== */
 
-/**
- * Terapkan snapshot publik dari server.
- * FIX: Gunakan currentTurnName (nama) bukan currentTurn (ID).
- * FIX: Map id→name dari snapshot.players agar opponents tampil nama.
- */
 function applyPublicSnapshot(snapshot) {
   if (!snapshot) return;
-
   state.phase           = snapshot.phase;
   state.currentTurn     = snapshot.currentTurn;
-  state.currentTurnName = snapshot.currentTurnName || snapshot.currentTurn; // FIX
+  state.currentTurnName = snapshot.currentTurnName || snapshot.currentTurn;
   state.isMyTurn        = snapshot.currentTurn === myId;
   state.stockRemaining  = snapshot.stockRemaining;
   state.discardPileTop3 = snapshot.discardPileTop3 || [];
+  state.discardCount    = snapshot.discardCount    || state.discardPileTop3.length;
 
-  // FIX: Gunakan name dari snapshot.players untuk opponents
+  // Use extended discard pile if server sends it
+  if (snapshot.discardPileFull) {
+    state.discardPileFull = snapshot.discardPileFull;
+  } else {
+    // Fall back to top3 only
+    state.discardPileFull = state.discardPileTop3;
+  }
+
   state.opponents = (snapshot.players || [])
     .filter(p => p.id !== myId)
     .map(p => ({
       id:        p.id,
-      name:      p.name || p.id, // FIX: pakai nama, bukan ID
+      name:      p.name || p.id,
       handCount: p.handCount,
       active:    p.id === snapshot.currentTurn,
       connected: p.connected
@@ -885,61 +1740,52 @@ function applyPublicSnapshot(snapshot) {
   render();
 }
 
-// State update publik (broadcast ke semua)
 RemiClient.on('state_update', (msg) => {
   applyPublicSnapshot(msg.snapshot);
 });
 
-// Game dimulai → terapkan snapshot awal
 RemiClient.on('game_started', (msg) => {
   applyPublicSnapshot(msg.snapshot);
   showToast(`Game dimulai! Giliran pertama: ${msg.snapshot?.currentTurnName || '...'}`);
 });
 
-// Kartu tangan pribadi (hanya untuk saya)
 RemiClient.on('private_hand', (msg) => {
-  state.myHand         = msg.hand  || [];
-  state.myMelds        = msg.melds || [];
+  state.myHand          = msg.hand  || [];
+  state.myMelds         = msg.melds || [];
   state.myHasBaseSeries = !!msg.hasBaseSeries;
   state.selected.clear();
   render();
 });
 
-// Putaran selesai → tampilkan overlay skor
 RemiClient.on('round_over', (msg) => {
   showGameOverOverlay(msg);
   state.phase = 'GAME_OVER';
   updateButtons();
+  leaveVoiceChat(); // End VC when game ends
 });
 
-// Error dari server
 RemiClient.on('error', (msg) => {
   showToast('⚠ ' + msg.message, true);
 });
 
-// Koneksi
 RemiClient.on('disconnected', () => {
   showToast('Koneksi putus, mencoba menyambung ulang...', true);
 });
-RemiClient.on('connected', () => {
-  // Tidak perlu toast tiap connect (termasuk reconnect)
-});
 
-// Pemain lain disconnect/reconnect
 RemiClient.on('player_disconnected', (msg) => {
   showToast(`⚠ ${msg.playerName || msg.playerId} terputus koneksi`, true);
 });
+
 RemiClient.on('player_reconnected', (msg) => {
   showToast(`✓ ${msg.playerName || msg.playerId} kembali terhubung`);
 });
 
-// Reconnect: jika ada snapshot, terapkan
 RemiClient.on('reconnected', (msg) => {
   if (msg.snapshot) {
     applyPublicSnapshot(msg.snapshot);
     if (msg.snapshot.myHand) {
-      state.myHand         = msg.snapshot.myHand;
-      state.myMelds        = msg.snapshot.myMelds || [];
+      state.myHand          = msg.snapshot.myHand;
+      state.myMelds         = msg.snapshot.myMelds || [];
       state.myHasBaseSeries = !!msg.snapshot.myHasBaseSeries;
     }
     render();
@@ -961,17 +1807,17 @@ function showGameOverOverlay(data) {
 
   if (data.stockEmpty) {
     title.textContent = '📦 Stock Habis!';
-    sub.textContent = 'Putaran berakhir karena stock pile kosong.';
+    sub.textContent   = 'Putaran berakhir karena stock pile kosong — skor dihitung dari kondisi saat ini.';
   } else {
     title.textContent = '🏆 Permainan Selesai!';
-    sub.textContent = `${data.winnerName || data.winner} berhasil menutup permainan!`;
+    sub.textContent   = `${data.winnerName || data.winner} berhasil menutup permainan!`;
   }
 
   scores.innerHTML = '';
   if (data.roundScores) {
     data.roundScores.forEach(s => {
-      const li = document.createElement('li');
-      const name = s.playerId === myId ? `${s.playerId} (kamu)` : s.playerId;
+      const li   = document.createElement('li');
+      const name = s.playerId === myId ? 'Kamu' : (s.playerName || s.playerId);
       li.innerHTML = `<span>${name}</span><span class="pts">${s.total > 0 ? '+' : ''}${s.total}</span>`;
       scores.appendChild(li);
     });
@@ -980,8 +1826,8 @@ function showGameOverOverlay(data) {
   total.innerHTML = '';
   if (data.totalScores) {
     Object.entries(data.totalScores).forEach(([id, pts]) => {
-      const li = document.createElement('li');
-      const name = id === myId ? `${id} (kamu)` : id;
+      const li   = document.createElement('li');
+      const name = id === myId ? 'Kamu' : id;
       li.innerHTML = `<span>${name}</span><span class="pts">${pts}</span>`;
       total.appendChild(li);
     });
@@ -994,7 +1840,7 @@ function showGameOverOverlay(data) {
    INIT
    ===================================================== */
 RemiClient.connect();
-render(); // render awal (kosong) agar halaman tidak blank
+render();
 </script>
 
 </body>
