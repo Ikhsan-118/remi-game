@@ -1,267 +1,495 @@
 /**
- * RoomManager.js
+ * server.js
  * =====================================================
- * Mengelola siklus hidup "Ruang Permainan" (Room).
+ * WebSocket server untuk Remi Indonesia multiplayer.
  *
  * UPDATE v3:
- *  ✓ NEW: MAX_PLAYERS dinaikkan dari 4 → 8 (mendukung dek ganda di GameState/Deck)
- *  ✓ NEW: options.maxPlayers dari client kini di-clamp ke [MIN_PLAYERS, MAX_PLAYERS]
- *  ✓ NEW: startGame() bisa melanjutkan match yang sama (skor akumulasi tetap)
- *         jika daftar pemain belum berubah sejak putaran sebelumnya — ini yang
- *         membuat "game bisa mulai lagi" setelah round_over, bukan hanya berhenti.
- *         Jika daftar pemain berubah (ada yang keluar/masuk), match baru dibuat
- *         dan skor akumulasi di-reset.
+ *  ✓ FIX: _handleRoundOver kini mengembalikan room ke status LOBBY
+ *         (broadcastLobby) sehingga host bisa menekan "Mulai Permainan"
+ *         lagi untuk lanjut main (skor akumulasi tetap, lihat
+ *         RoomManager.startGame) — sebelumnya room tetap berstatus
+ *         PLAYING selamanya setelah round_over dan tidak bisa dipakai lagi.
  *
  * (fix versi sebelumnya tetap dipertahankan)
- *  ✓ Reset ready semua pemain saat pemain baru bergabung
- *  ✓ startGame() meneruskan map nama pemain ke GameState
- *  ✓ canStart tidak bisa true jika ada pemain yang belum siap (strict check)
- *  ✓ Lebih jelas tracking status koneksi saat game berlangsung
+ *  ✓ handleLeaveRoom sekarang broadcastLobby agar client update
+ *  ✓ Pemain disconnect di lobby → reset ready + broadcastLobby
+ *  ✓ handleStartGame memvalidasi semua pemain sudah ready
+ *  ✓ broadcastGameState menyertakan nama pemain
+ *  ✓ Pesan error lebih informatif
+ *  ✓ Voice Chat signaling (vc_signal) — relay WebRTC offer/answer/ICE
+ *  ✓ Snapshot publik menyertakan discardPileFull, discardCount, maxEatDepth
+ *  ✓ round_over menyertakan playerName di roundScores
+ *
+ * Protokol pesan (JSON):
+ *   Client → Server:
+ *     { type: 'create_room',   name, options }
+ *     { type: 'join_room',     code, name }
+ *     { type: 'set_ready',     ready }
+ *     { type: 'start_game' }
+ *     { type: 'draw_stock' }
+ *     { type: 'draw_discard',  positionFromTop }
+ *     { type: 'place_meld',    cardIds }
+ *     { type: 'discard',       cardId, attemptClose }
+ *     { type: 'reconnect',     playerId, code }
+ *     { type: 'leave_room' }
+ *     { type: 'vc_signal',     action, fromId, toId?, sdp?, candidate? }
+ *
+ *   Server → Client:
+ *     { type: 'room_created',       code, playerId, room }
+ *     { type: 'room_joined',        code, playerId, room }
+ *     { type: 'lobby_update',       room }
+ *     { type: 'game_started',       snapshot }
+ *     { type: 'state_update',       snapshot }
+ *     { type: 'private_hand',       hand, melds, hasBaseSeries }
+ *     { type: 'round_over',         roundScores, totalScores, winner, winnerName }
+ *     { type: 'error',              message }
+ *     { type: 'reconnected',        room, snapshot }
+ *     { type: 'player_disconnected', playerId, playerName }
+ *     { type: 'player_reconnected',  playerId, playerName }
+ *     { type: 'vc_signal',          action, fromId, toId?, sdp?, candidate? }
  */
 
-const { GameState, MIN_PLAYERS: ENGINE_MIN_PLAYERS, MAX_PLAYERS: ENGINE_MAX_PLAYERS } = require('../engine/GameState');
+const WebSocket = require('ws');
+const crypto    = require('crypto');
+const { RoomManager } = require('./RoomManager');
 
-// Karakter InviteCode — hindari 0/O dan 1/I yang membingungkan
-const CODE_CHARS        = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const CODE_LENGTH       = 5;
-const MAX_PLAYERS       = ENGINE_MAX_PLAYERS || 8; // mendukung 2-8 pemain (dek ganda otomatis di atas 4 pemain)
-const MIN_PLAYERS       = ENGINE_MIN_PLAYERS || 2;
-const ROOM_IDLE_TIMEOUT = 30 * 60 * 1000; // 30 menit → dihapus
+const PORT        = process.env.PORT || 8080;
+const roomManager = new RoomManager();
 
-class Room {
-  constructor(code, hostId, hostName, options = {}) {
-    this.code     = code;
-    this.hostId   = hostId;
-    this.status   = 'LOBBY';   // 'LOBBY' | 'PLAYING' | 'FINISHED'
-    this.options  = {
-      useJokers:  options.useJokers  ?? false,
-      mode:       options.mode       ?? 'traditional',
-      // Clamp ke rentang yang didukung engine (2-8 pemain)
-      maxPlayers: Math.min(Math.max(Number(options.maxPlayers) || 4, MIN_PLAYERS), MAX_PLAYERS)
-    };
-    this.players      = [{ id: hostId, name: hostName, ready: false, connected: true, socketId: null }];
-    this.game         = null;
-    this.createdAt    = Date.now();
-    this.lastActivity = Date.now();
-  }
+// Map: ws → { playerId, roomCode }
+const connMeta      = new Map();
+// Map: playerId → ws
+const playerSockets = new Map();
 
-  touch() { this.lastActivity = Date.now(); }
+const wss = new WebSocket.Server({ port: PORT });
+console.log(`🃏 Remi WebSocket server berjalan di port ${PORT}`);
 
-  get playerCount() { return this.players.length; }
-  get isFull()      { return this.playerCount >= this.options.maxPlayers; }
+// ─────────────────────────────────────────────────────
+// Helper kirim pesan
+// ─────────────────────────────────────────────────────
 
-  /** 
-   * canStart: cukup minimal pemain, semua sudah siap, dan masih di lobby.
-   */
-  get canStart() {
-    return (
-      this.playerCount >= MIN_PLAYERS &&
-      this.status === 'LOBBY' &&
-      this.players.every(p => p.ready)
-    );
-  }
-
-  addPlayer(playerId, playerName) {
-    if (this.status !== 'LOBBY') {
-      return { success: false, reason: 'Permainan sudah dimulai, tidak bisa bergabung' };
-    }
-    if (this.isFull) {
-      return { success: false, reason: `Ruang penuh (maksimal ${this.options.maxPlayers} pemain)` };
-    }
-    if (this.players.some(p => p.name.toLowerCase() === playerName.toLowerCase())) {
-      return { success: false, reason: 'Nama sudah digunakan pemain lain di ruang ini' };
-    }
-
-    // Reset ready semua pemain saat ada pemain baru bergabung
-    // Ini mencegah skenario: 2 pemain siap → 1 keluar → 1 baru join → host langsung mulai
-    this.players.forEach(p => { p.ready = false; });
-
-    this.players.push({ id: playerId, name: playerName, ready: false, connected: true, socketId: null });
-    this.touch();
-    return { success: true };
-  }
-
-  removePlayer(playerId) {
-    this.players = this.players.filter(p => p.id !== playerId);
-
-    // Pindah host ke pemain pertama yang tersisa
-    if (this.players.length > 0 && this.hostId === playerId) {
-      this.hostId = this.players[0].id;
-    }
-
-    // Reset ready semua pemain yang tersisa saat ada yang keluar
-    // Ini memastikan game tidak bisa dimulai tanpa konfirmasi ulang
-    if (this.status === 'LOBBY') {
-      this.players.forEach(p => { p.ready = false; });
-    }
-
-    this.touch();
-  }
-
-  setReady(playerId, ready) {
-    const p = this.players.find(p => p.id === playerId);
-    if (p) { p.ready = ready; }
-    this.touch();
-  }
-
-  setConnected(playerId, connected) {
-    const p = this.players.find(p => p.id === playerId);
-    if (p) { p.connected = connected; }
-    this.touch();
-  }
-
-  /**
-   * Apakah daftar pemain (set of id) masih sama persis dengan saat
-   * `this.game` terakhir dibuat? Dipakai untuk menentukan apakah putaran
-   * baru bisa melanjutkan match yang sama (skor akumulasi) atau harus
-   * membuat GameState baru (skor reset).
-   */
-  _sameRosterAsGame() {
-    if (!this.game) return false;
-    const currentIds = this.players.map(p => p.id).sort();
-    const gameIds     = this.game.players.map(p => p.id).sort();
-    if (currentIds.length !== gameIds.length) return false;
-    return currentIds.every((id, i) => id === gameIds[i]);
-  }
-
-  /**
-   * Mulai (atau lanjutkan) permainan.
-   *
-   *  - Jika belum pernah ada game di room ini, ATAU daftar pemain sudah
-   *    berubah sejak putaran terakhir → buat GameState baru (skor reset).
-   *  - Jika game sebelumnya sudah GAME_OVER dan daftar pemain masih sama
-   *    persis → lanjutkan match yang sama dengan `startNextRound()`,
-   *    sehingga skor akumulasi (this.game.scores) tetap terbawa.
-   *
-   *  Ini yang memungkinkan "game bisa mulai lagi" setelah stock habis /
-   *  ada pemenang, alih-alih room menjadi permanen tidak bisa dipakai lagi.
-   */
-  startGame() {
-    if (this.playerCount < MIN_PLAYERS) {
-      return { success: false, reason: `Minimal ${MIN_PLAYERS} pemain untuk mulai` };
-    }
-    if (this.status !== 'LOBBY') {
-      return { success: false, reason: 'Permainan sudah berjalan atau sudah selesai' };
-    }
-    if (!this.players.every(p => p.ready)) {
-      return { success: false, reason: 'Semua pemain harus siap sebelum memulai permainan' };
-    }
-
-    const canContinueMatch = this.game && this._sameRosterAsGame();
-
-    if (canContinueMatch) {
-      this.status = 'PLAYING';
-      this.touch();
-      return { success: true, snapshot: this.game.startNextRound(), continued: true };
-    }
-
-    // Match baru (pertama kali, atau roster berubah → skor reset)
-    const playerIds   = this.players.map(p => p.id);
-    const playerNames = {};
-    this.players.forEach(p => { playerNames[p.id] = p.name; });
-
-    this.game   = new GameState(playerIds, playerNames, {
-      useJokers: this.options.useJokers,
-      mode:      this.options.mode
-    });
-    this.status = 'PLAYING';
-    this.touch();
-
-    return { success: true, snapshot: this.game.startRound(), continued: false };
-  }
-
-  /**
-   * Dipanggil saat sebuah putaran berakhir (round_over). Mengembalikan room
-   * ke status LOBBY dan mereset status "siap" semua pemain, sehingga host
-   * bisa memilih untuk memulai putaran baru (lanjut) atau membiarkan room
-   * berakhir begitu saja (pemain keluar satu-satu / room idle dihapus).
-   */
-  returnToLobbyAfterRound() {
-    this.status = 'LOBBY';
-    this.players.forEach(p => { p.ready = false; });
-    this.touch();
-  }
-
-  playerNameOf(playerId) {
-    return this.players.find(p => p.id === playerId)?.name ?? playerId;
-  }
-
-  toLobbySummary() {
-    return {
-      code:     this.code,
-      status:   this.status,
-      hostId:   this.hostId,
-      options:  this.options,
-      players:  this.players.map(p => ({
-        id:        p.id,
-        name:      p.name,
-        ready:     p.ready,
-        connected: p.connected,
-        isHost:    p.id === this.hostId
-      }))
-    };
+function send(ws, payload) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
   }
 }
 
-class RoomManager {
-  constructor() {
-    this.rooms = new Map(); // code → Room
-  }
+function sendToPlayer(playerId, payload) {
+  const sock = playerSockets.get(playerId);
+  if (sock) send(sock, payload);
+}
 
-  _generateCode() {
-    let code;
-    do {
-      code = Array.from({ length: CODE_LENGTH }, () =>
-        CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]
-      ).join('');
-    } while (this.rooms.has(code));
-    return code;
-  }
+function broadcastToRoom(room, payload, excludePlayerId = null) {
+  room.players.forEach(p => {
+    if (p.id !== excludePlayerId) sendToPlayer(p.id, payload);
+  });
+}
 
-  createRoom(hostId, hostName, options = {}) {
-    const code = this._generateCode();
-    const room = new Room(code, hostId, hostName, options);
-    this.rooms.set(code, room);
-    return room;
-  }
+/**
+ * Kirim state_update (publik) ke semua pemain +
+ * private_hand (kartu tangan) ke masing-masing pemain.
+ *
+ * Snapshot publik menyertakan discardPileFull, discardCount, maxEatDepth & deckCount.
+ */
+function broadcastGameState(room) {
+  if (!room.game) return;
 
-  getRoom(code) {
-    return this.rooms.get((code || '').toUpperCase().trim());
-  }
+  const publicSnapshot = room.game.snapshotPublic();
+  broadcastToRoom(room, { type: 'state_update', snapshot: publicSnapshot });
 
-  joinRoom(code, playerId, playerName) {
-    const room = this.getRoom(code);
-    if (!room) {
-      return { success: false, reason: `Kode ruang "${code}" tidak ditemukan` };
+  room.players.forEach(p => {
+    const playerState = room.game.players.find(gp => gp.id === p.id);
+    if (!playerState) return;
+    sendToPlayer(p.id, {
+      type:          'private_hand',
+      hand:          playerState.hand.map(c => c.toString()),
+      melds:         playerState.melds.map(m => m.map(c => c.toString())),
+      hasBaseSeries: playerState.hasBaseSeries
+    });
+  });
+}
+
+function broadcastLobby(room) {
+  broadcastToRoom(room, { type: 'lobby_update', room: room.toLobbySummary() });
+}
+
+// ─────────────────────────────────────────────────────
+// Connection handler
+// ─────────────────────────────────────────────────────
+
+wss.on('connection', (ws) => {
+  console.log('Koneksi WebSocket baru masuk');
+
+  ws.on('message', (raw) => {
+    let msg;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return send(ws, { type: 'error', message: 'Format pesan tidak valid (harus JSON)' });
     }
-    const result = room.addPlayer(playerId, playerName);
-    if (!result.success) return result;
-    return { success: true, room };
-  }
+    handleMessage(ws, msg);
+  });
 
-  removeRoomIfEmpty(code) {
-    const room = this.rooms.get((code || '').toUpperCase().trim());
-    if (room && room.players.length === 0) {
-      this.rooms.delete((code || '').toUpperCase().trim());
-      return true;
-    }
-    return false;
-  }
+  ws.on('close', () => {
+    const meta = connMeta.get(ws);
+    if (!meta) return;
 
-  /** Hapus room yang sudah idle terlalu lama */
-  cleanupIdleRooms() {
-    const now = Date.now();
-    let removed = 0;
-    for (const [code, room] of this.rooms.entries()) {
-      if (now - room.lastActivity > ROOM_IDLE_TIMEOUT) {
-        this.rooms.delete(code);
-        removed++;
+    const { playerId, roomCode } = meta;
+    const room = roomManager.getRoom(roomCode);
+
+    if (room) {
+      const playerName = room.playerNameOf(playerId);
+
+      if (room.status === 'PLAYING' && room.game) {
+        room.game.playerDisconnect(playerId);
+        room.setConnected(playerId, false);
+        broadcastToRoom(room, { type: 'player_disconnected', playerId, playerName });
+        broadcastGameState(room);
+        console.log(`Pemain ${playerName} (${playerId}) disconnect saat game berlangsung`);
+      } else {
+        room.removePlayer(playerId);
+        roomManager.removeRoomIfEmpty(roomCode);
+        if (roomManager.getRoom(roomCode)) {
+          broadcastLobby(room);
+        }
+        console.log(`Pemain ${playerName} keluar dari lobby ${roomCode}`);
       }
     }
-    return removed;
-  }
 
-  get totalRooms() { return this.rooms.size; }
+    connMeta.delete(ws);
+    playerSockets.delete(playerId);
+  });
+
+  ws.on('error', (err) => {
+    console.error('WebSocket error:', err.message);
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// Message router
+// ─────────────────────────────────────────────────────
+
+function handleMessage(ws, msg) {
+  const handlers = {
+    create_room:  handleCreateRoom,
+    join_room:    handleJoinRoom,
+    set_ready:    handleSetReady,
+    start_game:   handleStartGame,
+    draw_stock:   handleDrawStock,
+    draw_discard: handleDrawDiscard,
+    place_meld:   handlePlaceMeld,
+    discard:      handleDiscard,
+    reconnect:    handleReconnect,
+    leave_room:   handleLeaveRoom,
+    vc_signal:    handleVcSignal
+  };
+
+  const handler = handlers[msg.type];
+  if (!handler) {
+    return send(ws, { type: 'error', message: `Tipe pesan tidak dikenal: ${msg.type}` });
+  }
+  try {
+    handler(ws, msg);
+  } catch (err) {
+    console.error('Error handling message:', err);
+    send(ws, { type: 'error', message: 'Terjadi kesalahan internal server' });
+  }
 }
 
-module.exports = { RoomManager, Room, MAX_PLAYERS, MIN_PLAYERS };
+// ─────────────────────────────────────────────────────
+// Handlers: Lobby
+// ─────────────────────────────────────────────────────
+
+function handleCreateRoom(ws, msg) {
+  const playerId   = crypto.randomUUID();
+  const playerName = (msg.name || 'Pemain').trim().slice(0, 20);
+
+  if (!playerName) {
+    return send(ws, { type: 'error', message: 'Nama pemain tidak boleh kosong' });
+  }
+
+  const room = roomManager.createRoom(playerId, playerName, msg.options || {});
+
+  connMeta.set(ws, { playerId, roomCode: room.code });
+  playerSockets.set(playerId, ws);
+
+  send(ws, { type: 'room_created', code: room.code, playerId, room: room.toLobbySummary() });
+  console.log(`Room dibuat: ${room.code} oleh ${playerName} (maks ${room.options.maxPlayers} pemain)`);
+}
+
+function handleJoinRoom(ws, msg) {
+  const playerId   = crypto.randomUUID();
+  const playerName = (msg.name || 'Pemain').trim().slice(0, 20);
+
+  if (!playerName) {
+    return send(ws, { type: 'error', message: 'Nama pemain tidak boleh kosong' });
+  }
+
+  const code = (msg.code || '').toUpperCase().trim();
+  if (!code) {
+    return send(ws, { type: 'error', message: 'Kode ruang tidak boleh kosong' });
+  }
+
+  const result = roomManager.joinRoom(code, playerId, playerName);
+  if (!result.success) {
+    return send(ws, { type: 'error', message: result.reason });
+  }
+
+  const room = result.room;
+  connMeta.set(ws, { playerId, roomCode: room.code });
+  playerSockets.set(playerId, ws);
+
+  send(ws, { type: 'room_joined', code: room.code, playerId, room: room.toLobbySummary() });
+  broadcastLobby(room);
+  console.log(`${playerName} bergabung ke room ${room.code}`);
+}
+
+function handleSetReady(ws, msg) {
+  const meta = connMeta.get(ws);
+  if (!meta) return send(ws, { type: 'error', message: 'Sesi tidak valid, sambungkan ulang' });
+
+  const room = roomManager.getRoom(meta.roomCode);
+  if (!room) return send(ws, { type: 'error', message: 'Ruang tidak ditemukan' });
+  if (room.status !== 'LOBBY') return send(ws, { type: 'error', message: 'Game sudah dimulai' });
+
+  room.setReady(meta.playerId, !!msg.ready);
+  broadcastLobby(room);
+}
+
+function handleStartGame(ws, msg) {
+  const meta = connMeta.get(ws);
+  if (!meta) return send(ws, { type: 'error', message: 'Sesi tidak valid' });
+
+  const room = roomManager.getRoom(meta.roomCode);
+  if (!room) return send(ws, { type: 'error', message: 'Ruang tidak ditemukan' });
+
+  if (room.hostId !== meta.playerId) {
+    return send(ws, { type: 'error', message: 'Hanya host yang bisa memulai permainan' });
+  }
+
+  const result = room.startGame();
+  if (!result.success) {
+    return send(ws, { type: 'error', message: result.reason });
+  }
+
+  broadcastToRoom(room, { type: 'game_started', snapshot: result.snapshot });
+  broadcastGameState(room);
+  console.log(`Game ${result.continued ? 'dilanjutkan' : 'dimulai'} di room ${room.code}, giliran pertama: ${result.snapshot.currentTurnName}`);
+}
+
+function handleLeaveRoom(ws, msg) {
+  const meta = connMeta.get(ws);
+  if (!meta) return;
+
+  const room = roomManager.getRoom(meta.roomCode);
+  if (room) {
+    const playerName = room.playerNameOf(meta.playerId);
+    room.removePlayer(meta.playerId);
+    roomManager.removeRoomIfEmpty(meta.roomCode);
+    if (roomManager.getRoom(meta.roomCode)) {
+      broadcastLobby(room);
+    }
+    console.log(`${playerName} meninggalkan room ${meta.roomCode}`);
+  }
+
+  connMeta.delete(ws);
+  playerSockets.delete(meta.playerId);
+}
+
+// ─────────────────────────────────────────────────────
+// Handlers: In-Game Actions
+// ─────────────────────────────────────────────────────
+
+function _getActiveGame(ws) {
+  const meta = connMeta.get(ws);
+  if (!meta) return null;
+  const room = roomManager.getRoom(meta.roomCode);
+  if (!room || !room.game) return null;
+  return { meta, room, game: room.game };
+}
+
+function handleDrawStock(ws, msg) {
+  const ctx = _getActiveGame(ws);
+  if (!ctx) return send(ws, { type: 'error', message: 'Tidak ada permainan aktif' });
+
+  const result = ctx.game.drawFromStock(ctx.meta.playerId);
+  if (!result.success) return send(ws, { type: 'error', message: result.reason });
+
+  if (result.gameOver) {
+    return _handleRoundOver(ctx.room, result);
+  }
+
+  broadcastGameState(ctx.room);
+}
+
+function handleDrawDiscard(ws, msg) {
+  const ctx = _getActiveGame(ws);
+  if (!ctx) return send(ws, { type: 'error', message: 'Tidak ada permainan aktif' });
+
+  const positionFromTop = typeof msg.positionFromTop === 'number' ? msg.positionFromTop : 0;
+
+  const result = ctx.game.drawFromDiscard(
+    ctx.meta.playerId,
+    positionFromTop,
+    msg.intendedMeld || null
+  );
+  if (!result.success) return send(ws, { type: 'error', message: result.reason });
+
+  broadcastGameState(ctx.room);
+}
+
+function handlePlaceMeld(ws, msg) {
+  const ctx = _getActiveGame(ws);
+  if (!ctx) return send(ws, { type: 'error', message: 'Tidak ada permainan aktif' });
+
+  if (!Array.isArray(msg.cardIds) || msg.cardIds.length < 3) {
+    return send(ws, { type: 'error', message: 'Minimal 3 kartu untuk membentuk kombinasi' });
+  }
+
+  const result = ctx.game.placeMeld(ctx.meta.playerId, msg.cardIds);
+  if (!result.success) return send(ws, { type: 'error', message: result.reason });
+
+  broadcastGameState(ctx.room);
+}
+
+function handleDiscard(ws, msg) {
+  const ctx = _getActiveGame(ws);
+  if (!ctx) return send(ws, { type: 'error', message: 'Tidak ada permainan aktif' });
+
+  if (!msg.cardId) {
+    return send(ws, { type: 'error', message: 'Pilih kartu yang ingin dibuang' });
+  }
+
+  const result = ctx.game.discard(ctx.meta.playerId, msg.cardId, !!msg.attemptClose);
+  if (!result.success) return send(ws, { type: 'error', message: result.reason });
+
+  if (result.gameOver) {
+    return _handleRoundOver(ctx.room, result);
+  }
+
+  broadcastGameState(ctx.room);
+}
+
+/**
+ * FIX: setelah putaran selesai (baik karena ada pemenang yang tutup game,
+ * maupun karena stock pile habis), room dikembalikan ke status LOBBY dan
+ * status "siap" semua pemain di-reset. Ini memastikan room TIDAK terjebak
+ * permanen di status PLAYING — host bisa menekan "Mulai Permainan" lagi
+ * untuk lanjut bermain (skor akumulasi tetap dipertahankan oleh GameState),
+ * atau pemain bisa memilih keluar dari room sepenuhnya.
+ */
+function _handleRoundOver(room, result) {
+  // Enrich roundScores with playerName from room
+  const enrichedScores = (result.roundScores || []).map(rs => ({
+    ...rs,
+    playerName: room.playerNameOf(rs.playerId)
+  }));
+
+  broadcastToRoom(room, {
+    type:        'round_over',
+    winner:      result.winner,
+    winnerName:  result.winnerName,
+    stockEmpty:  result.stockEmpty,
+    roundScores: enrichedScores,
+    totalScores: result.totalScores
+  });
+  broadcastGameState(room);
+
+  // Kembalikan room ke lobby agar bisa main lagi (atau dibubarkan oleh pemain).
+  room.returnToLobbyAfterRound();
+  broadcastLobby(room);
+
+  console.log(`Putaran selesai di room ${room.code}. Pemenang: ${result.winnerName || '(stock habis)'} — room dikembalikan ke lobby.`);
+}
+
+// ─────────────────────────────────────────────────────
+// Handler: Reconnect
+// ─────────────────────────────────────────────────────
+
+function handleReconnect(ws, msg) {
+  if (!msg.playerId || !msg.code) {
+    return send(ws, { type: 'error', message: 'playerId dan code diperlukan untuk reconnect' });
+  }
+
+  const room = roomManager.getRoom(msg.code);
+  if (!room) return send(ws, { type: 'error', message: 'Ruang tidak ditemukan' });
+
+  const playerExists = room.players.some(p => p.id === msg.playerId);
+  if (!playerExists) {
+    return send(ws, { type: 'error', message: 'Pemain tidak ditemukan di ruang ini' });
+  }
+
+  if (room.game && room.status === 'PLAYING') {
+    const result = room.game.playerReconnect(msg.playerId);
+    if (!result.success) {
+      return send(ws, { type: 'error', message: result.reason });
+    }
+  }
+
+  room.setConnected(msg.playerId, true);
+  connMeta.set(ws, { playerId: msg.playerId, roomCode: room.code });
+  playerSockets.set(msg.playerId, ws);
+
+  const playerName = room.playerNameOf(msg.playerId);
+
+  send(ws, {
+    type:     'reconnected',
+    room:     room.toLobbySummary(),
+    snapshot: (room.game && room.status === 'PLAYING') ? room.game.snapshotForPlayer(msg.playerId) : null
+  });
+
+  broadcastToRoom(room, { type: 'player_reconnected', playerId: msg.playerId, playerName }, msg.playerId);
+
+  if (room.game && room.status === 'PLAYING') {
+    broadcastGameState(room);
+  }
+
+  console.log(`Pemain ${playerName} berhasil reconnect ke room ${room.code}`);
+}
+
+// ─────────────────────────────────────────────────────
+// Handler: Voice Chat Signaling
+// ─────────────────────────────────────────────────────
+
+/**
+ * Relay WebRTC signaling messages within the same room.
+ * The server never inspects the SDP/ICE content — it just routes them.
+ *
+ * If msg.toId is specified, relay to that player only.
+ * If msg.toId is omitted (e.g. vc_joined / vc_left), broadcast to room.
+ */
+function handleVcSignal(ws, msg) {
+  const meta = connMeta.get(ws);
+  if (!meta) return;
+
+  const room = roomManager.getRoom(meta.roomCode);
+  if (!room) return;
+
+  const payload = {
+    type:      'vc_signal',
+    action:    msg.action,
+    fromId:    meta.playerId,           // always use server-verified ID
+    toId:      msg.toId   || null,
+    sdp:       msg.sdp    || null,
+    candidate: msg.candidate || null
+  };
+
+  if (msg.toId) {
+    // Unicast — send only to target player
+    sendToPlayer(msg.toId, payload);
+  } else {
+    // Broadcast to room except sender
+    broadcastToRoom(room, payload, meta.playerId);
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// Maintenance: bersihkan room idle setiap 5 menit
+// ─────────────────────────────────────────────────────
+
+setInterval(() => {
+  const removed = roomManager.cleanupIdleRooms();
+  if (removed > 0) console.log(`Membersihkan ${removed} room idle`);
+}, 5 * 60 * 1000);
+
+module.exports = { wss, roomManager };
