@@ -1,30 +1,43 @@
 /**
  * Deck.js — Dek kartu Remi Indonesia (52 kartu + opsional joker)
  * Shuffle menggunakan Fisher-Yates untuk distribusi acak yang adil.
+ *
+ * FIX (multi-deck support untuk 5–8 pemain):
+ *  ✓ NEW: parameter `deckCount` — jumlah dek 52-kartu yang digabung.
+ *         - 2–4 pemain → 1 dek (52 kartu, +2 Joker jika diaktifkan)
+ *         - 5–8 pemain → 2 dek (104 kartu, +4 Joker jika diaktifkan)
+ *         Jumlah Joker otomatis mengikuti deckCount (2 Joker per dek).
  */
 
 const { Card, Joker, SUITS, RANKS } = require('./Card');
 
 class Deck {
   /**
-   * @param {boolean} useJokers — apakah menyertakan 2 kartu Joker
+   * @param {boolean} useJokers  — apakah menyertakan kartu Joker
+   * @param {number}  deckCount  — jumlah dek 52-kartu yang digabung (default 1)
    */
-  constructor(useJokers = false) {
+  constructor(useJokers = false, deckCount = 1) {
     this.cards     = [];
     this.useJokers = useJokers;
+    this.deckCount = Math.max(1, Math.floor(deckCount) || 1);
     this._build();
   }
 
   _build() {
     this.cards = [];
-    for (const suit of SUITS) {
-      for (const rank of RANKS) {
-        this.cards.push(new Card(rank, suit));
+    for (let d = 0; d < this.deckCount; d++) {
+      for (const suit of SUITS) {
+        for (const rank of RANKS) {
+          this.cards.push(new Card(rank, suit));
+        }
       }
     }
     if (this.useJokers) {
-      this.cards.push(new Joker(1));
-      this.cards.push(new Joker(2));
+      // 2 Joker per dek yang digabungkan (1 dek → 2 Joker, 2 dek → 4 Joker, dst.)
+      const jokerCount = this.deckCount * 2;
+      for (let i = 1; i <= jokerCount; i++) {
+        this.cards.push(new Joker(i));
+      }
     }
   }
 
