@@ -97,6 +97,10 @@ test('Seri dengan Joker wildcard: 5♠-JOKER-7♠', () => {
   const r = validateSequence([new Card(5,'♠'), new Joker(1), new Card(7,'♠')]);
   assert(r.valid, r.reason);
 });
+test('Joker sebagai pengganti kartu tengah dalam seri gambar: J♦-JOKER-K♦', () => {
+  const r = validateSequence([new Card(11,'♦'), new Joker(1), new Card(13,'♦')]);
+  assert(r.valid, r.reason);
+});
 
 // ─────────────────────────────────────────────────────────
 // 3. Validasi Kembar
@@ -115,6 +119,10 @@ test('INVALID kembar: suit duplikat (7♠-7♠-7♦)', () => {
   const r = validateSet([new Card(7,'♠'), new Card(7,'♠'), new Card(7,'♦')]);
   assert(!r.valid, 'Seharusnya INVALID');
 });
+test('Kembar dengan Joker wildcard: 9♥-9♦-JOKER', () => {
+  const r = validateMeld([new Card(9,'♥'), new Card(9,'♦'), new Joker(1)], true);
+  assert(r.valid, r.reason);
+});
 
 // ─────────────────────────────────────────────────────────
 // 4. Aturan Dasar Seri
@@ -124,14 +132,14 @@ console.log('\n🏗 Aturan Dasar Seri');
 test('Kembar TIDAK boleh tanpa dasar seri', () => {
   const r = validateMeld(
     [new Card(7,'♥'), new Card(7,'♦'), new Card(7,'♠')],
-    false  // hasBaseSeries = false
+    false
   );
   assert(!r.valid, 'Seharusnya INVALID tanpa dasar seri');
 });
 test('Kembar BOLEH setelah ada dasar seri', () => {
   const r = validateMeld(
     [new Card(7,'♥'), new Card(7,'♦'), new Card(7,'♠')],
-    true   // hasBaseSeries = true
+    true
   );
   assert(r.valid, r.reason);
 });
@@ -175,7 +183,6 @@ test('Skenario B: tanpa dasar seri = semua kartu jadi penalti', () => {
     melds: [], hand: cards, hasBaseSeries: false,
     isWinner: false, closingCard: null, pao: false
   });
-  // 4 kartu angka × 5 poin = 20, 3 kartu Q × 10 poin = 30 → total penalti = -50
   assert(r.total === -50, `Expected -50, got ${r.total}`);
 });
 test('Tutup game dengan As mendapat +150 bonus', () => {
@@ -202,26 +209,36 @@ test('Penalti Pao = -150 poin', () => {
 // ─────────────────────────────────────────────────────────
 console.log('\n🏁 Tutup Game');
 
-test('Tutup game valid: punya dasar seri + 1 kartu tersisa', () => {
+test('Tutup game valid: punya dasar seri + tangan kosong', () => {
   const r = canCloseGame(
     [[new Card(3,'♠'), new Card(4,'♠'), new Card(5,'♠')]],
-    [new Card(7,'♥')],
+    [],      // hand sudah kosong setelah discard kartu penutup
     true, true
   );
   assert(r.canClose, r.reason);
 });
 test('INVALID tutup game: belum punya dasar seri', () => {
-  const r = canCloseGame([], [new Card(7,'♥')], true, false);
+  const r = canCloseGame([], [], true, false);
   assert(!r.canClose, 'Seharusnya tidak bisa tutup');
 });
-test('INVALID tutup sendiri (dari stock pile)', () => {
+test('Tutup dari stock pile VALID (aturan bebas)', () => {
+  // drewFromDiscard = false (dari stock), tapi tetap bisa tutup
   const r = canCloseGame(
     [[new Card(3,'♠'), new Card(4,'♠'), new Card(5,'♠')]],
-    [new Card(7,'♥')],
-    false, // bukan dari buangan lawan
+    [],        // tangan kosong setelah discard
+    false,     // dari stock
+    true       // punya dasar seri
+  );
+  assert(r.canClose, `Seharusnya bisa tutup dari stock: ${r.reason}`);
+});
+test('Tutup dari buangan lawan VALID', () => {
+  const r = canCloseGame(
+    [[new Card(3,'♠'), new Card(4,'♠'), new Card(5,'♠')]],
+    [],
+    true,  // dari buangan lawan
     true
   );
-  assert(!r.canClose, 'Seharusnya tidak bisa tutup sendiri');
+  assert(r.canClose, r.reason);
 });
 
 // ─────────────────────────────────────────────────────────
@@ -230,29 +247,45 @@ test('INVALID tutup sendiri (dari stock pile)', () => {
 console.log('\n🎮 GameState Integrasi');
 
 test('Game dimulai dengan 7 kartu per pemain', () => {
-  const g = new GameState(['A', 'B'], { useJokers: false });
+  const g = new GameState(['A', 'B'], { A: 'Alice', B: 'Bob' }, { useJokers: false });
   g.startRound();
   assert(g.players[0].hand.length === 7, `P1 punya ${g.players[0].hand.length} kartu`);
   assert(g.players[1].hand.length === 7, `P2 punya ${g.players[1].hand.length} kartu`);
 });
 test('Stock pile berisi 37 kartu setelah deal (52 - 14 - 1 discard)', () => {
-  const g = new GameState(['A', 'B']);
+  const g = new GameState(['A', 'B'], { A: 'Alice', B: 'Bob' });
   g.startRound();
   assert(g.stockPile.length === 37, `Expected 37, got ${g.stockPile.length}`);
 });
 test('Draw dari stock menambah 1 kartu ke tangan', () => {
-  const g = new GameState(['A', 'B']);
+  const g = new GameState(['A', 'B'], { A: 'Alice', B: 'Bob' });
   g.startRound();
-  const before = g.players[0].hand.length;
+  // force turn to A
+  g.currentTurnIdx = g.players.findIndex(p => p.id === 'A');
+  const before = g.currentPlayer.hand.length;
   const result = g.drawFromStock('A');
   assert(result.success, result.reason);
-  assert(g.players[0].hand.length === before + 1);
+  assert(g.currentPlayer.hand.length === before + 1);
 });
 test('Bukan giliran pemain lain tidak boleh draw', () => {
-  const g = new GameState(['A', 'B']);
+  const g = new GameState(['A', 'B'], { A: 'Alice', B: 'Bob' });
   g.startRound();
-  const result = g.drawFromStock('B');
+  // Cari pemain yang bukan giliran
+  const notCurrent = g.players.find(p => p.id !== g.currentPlayer.id);
+  const result = g.drawFromStock(notCurrent.id);
   assert(!result.success, 'Seharusnya gagal');
+});
+test('Batas makan buangan: 2-3 pemain = Infinity', () => {
+  const g = new GameState(['A', 'B'], { A: 'Alice', B: 'Bob' });
+  assert(g.maxEatDepth === Infinity, `Expected Infinity, got ${g.maxEatDepth}`);
+});
+test('Batas makan buangan: 4 pemain = 5', () => {
+  const g = new GameState(['A','B','C','D'], { A:'A',B:'B',C:'C',D:'D' });
+  assert(g.maxEatDepth === 5, `Expected 5, got ${g.maxEatDepth}`);
+});
+test('Batas makan buangan: 5 pemain = 6', () => {
+  const g = new GameState(['A','B','C','D','E'], { A:'A',B:'B',C:'C',D:'D',E:'E' });
+  assert(g.maxEatDepth === 6, `Expected 6, got ${g.maxEatDepth}`);
 });
 
 // ─────────────────────────────────────────────────────────
