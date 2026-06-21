@@ -38,13 +38,13 @@ class Deck {
     return this;
   }
 
-  /** Ambil kartu teratas (pop dari depan array) */
+  /** Ambil kartu teratas (shift dari depan array) */
   draw() {
     if (this.cards.length === 0) return null;
     return this.cards.shift();
   }
 
-  /** Bagikan N kartu ke tiap pemain */
+  /** Bagikan N kartu ke tiap pemain (round-robin) */
   deal(playerCount, cardsPerPlayer = 7) {
     const hands = Array.from({ length: playerCount }, () => []);
     for (let i = 0; i < cardsPerPlayer; i++) {
