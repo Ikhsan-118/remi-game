@@ -16,16 +16,17 @@
  * Syarat tutup game (Going Out):
  *  - Pemain sudah punya dasar seri di meja
  *  - Sisa tepat 1 kartu di tangan (kartu penutup)
- *  - ATURAN "Tidak Boleh Tutup Sendiri":
- *      Kartu penutup HARUS berasal dari buangan lawan (bukan dari stock pile)
- *      Ini berarti: pemain tidak bisa tutup game di giliran sendiri dengan ambil dari stock
- *      → pemain tutup game HANYA saat giliran lawan membuang kartu yang bisa dipakai penutup
- *      ATAU saat makan buangan lawan yang menjadi kartu terakhirnya
+ *
+ * UPDATE: Aturan "Tidak Boleh Tutup Sendiri" DIHAPUS atas permintaan
+ * pemain — game terasa terlalu kaku jika kartu penutup wajib berasal
+ * dari buangan lawan. Sekarang pemain boleh menutup game dengan kartu
+ * penutup dari mana saja (termasuk hasil draw dari stock pile sendiri),
+ * selama sudah punya dasar seri dan tangan tersisa tepat 1 kartu.
  *
  * CATATAN IMPLEMENTASI:
  *  - attemptClose=true dalam aksi discard → pemain buang kartu terakhirnya sebagai penutup
- *  - Kartu terakhir ini diasumsikan sudah masuk tangan lewat makan buangan lawan (drawFromDiscard)
- *  - Server wajib memvalidasi bahwa pemain memang ambil dari buangan (bukan stock) sebelum tutup
+ *  - Parameter `drewFromDiscard` masih diterima untuk kompatibilitas /
+ *    keperluan statistik, tapi TIDAK LAGI memengaruhi hasil canClose.
  */
 
 const { isJoker } = require('./MeldingValidator');
@@ -155,21 +156,16 @@ function calculateRoundScores(players, mode = 'traditional') {
 /**
  * Cek apakah kondisi tutup game valid (Going Out).
  *
- * ATURAN "TIDAK BOLEH TUTUP SENDIRI":
- *   Pemain hanya bisa menutup game jika kartu penutupnya berasal dari buangan lawan.
- *   Artinya: pemain tidak bisa tutup game di giliran sendiri setelah ambil dari stock pile.
- *   Pemain bisa tutup saat:
- *     (a) Makan buangan lawan → kombinasi langsung → tersisa 0 kartu di tangan → tutup
- *     (b) Atau: di giliran sendiri, setelah makan buangan lawan sebelumnya,
- *         kini tinggal 1 kartu → discard kartu itu sebagai penutup
- *         TETAPI ini hanya valid jika kartu terakhir itu bukan dari stock pile.
- *
- * NOTE: Parameter `fromOpponentDiscard` di sini dilacak oleh GameState
- * berdasarkan apakah giliran terakhir pemain menggunakan drawFromDiscard atau drawFromStock.
+ * UPDATE: Aturan "Tidak Boleh Tutup Sendiri" sudah DIHAPUS. Sekarang
+ * pemain boleh menutup game dengan kartu penutup dari mana saja —
+ * baik hasil draw dari stock pile sendiri maupun makan buangan lawan.
+ * Syarat yang tersisa hanya:
+ *   1. Pemain sudah memiliki dasar seri di meja
+ *   2. Setelah kartu penutup dibuang, tangan harus benar-benar kosong
  *
  * @param {Card[][]} melds
  * @param {Card[]}   hand                — sisa kartu (setelah dibuang, harus kosong)
- * @param {boolean}  drewFromDiscard     — apakah giliran ini ambil dari buangan (bukan stock)?
+ * @param {boolean}  drewFromDiscard     — (diabaikan, dipertahankan untuk kompatibilitas signature)
  * @param {boolean}  hasBaseSeries
  *
  * @returns {{ canClose: boolean, reason: string }}
@@ -185,13 +181,6 @@ function canCloseGame(melds, hand, drewFromDiscard = false, hasBaseSeries = fals
     return {
       canClose: false,
       reason: `Masih ada ${hand.length} kartu di tangan selain kartu penutup`
-    };
-  }
-
-  if (!drewFromDiscard) {
-    return {
-      canClose: false,
-      reason: 'Aturan "Tidak Boleh Tutup Sendiri": penutup game harus dari buangan lawan, bukan dari stock pile'
     };
   }
 
