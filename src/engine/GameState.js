@@ -3,15 +3,38 @@
  * =====================================================
  * State machine untuk satu sesi permainan Remi Indonesia.
  *
- * UPDATE v2:
- *  ✓ FIX: Pemain pertama dipilih secara acak
- *  ✓ FIX: Tracking drewFromDiscard per pemain
- *  ✓ FIX: Phase state machine yang lebih jelas
- *  ✓ FIX: Nama pemain disertakan dalam snapshot
- *  ✓ FIX: canCloseGame dipanggil dengan drewFromDiscard yang benar
- *  ✓ NEW: snapshotPublic() — menyertakan discardPileFull & discardCount
- *         sehingga client bisa menampilkan semua kartu buangan dalam popup.
- *  ✓ NEW: Stock habis → otomatis trigger _triggerStockEmpty() saat draw.
+ * UPDATE v3 — perbaikan bug & fitur baru:
+ *
+ *  ✓ FIX BUG #1 (Stock habis tidak menghentikan game):
+ *    Sebelumnya, game hanya berakhir kalau seorang pemain BENAR-BENAR
+ *    mencoba `drawFromStock()` saat stock = 0. Akibatnya jika pemain
+ *    berikutnya memilih makan dari discard pile, game terus berjalan
+ *    tanpa batas walau stock sudah kosong.
+ *    Sekarang: begitu giliran berpindah (`_nextTurn`) dan stock sudah
+ *    0 kartu, putaran otomatis diakhiri & skor langsung dihitung —
+ *    tidak menunggu aksi draw apa pun dari pemain berikutnya.
+ *
+ *  ✓ NEW FITUR #2 (Batas kedalaman "Makan Buangan" berdasar jumlah pemain):
+ *    - 2–3 pemain  → tidak ada batas (seperti sebelumnya)
+ *    - 4 pemain    → maksimal 5 kartu teratas tumpukan buangan
+ *    - Setiap +1 pemain di atas 4 → +1 kartu teratas yang boleh diambil
+ *      (5 pemain → 6, 6 pemain → 7, 7 pemain → 8, 8 pemain → 9)
+ *    Batas ini dihitung sebagai `this.maxEatDepth` dan diteruskan ke
+ *    `validateEat()` serta disertakan dalam snapshot publik agar
+ *    client bisa menampilkannya di UI.
+ *
+ *  ✓ NEW FITUR #3 (Dukungan 2–8 pemain & dek ganda):
+ *    - 2–4 pemain → 1 dek (52 kartu + 2 Joker jika diaktifkan)
+ *    - 5–8 pemain → 2 dek digabung (104 kartu + 4 Joker jika diaktifkan)
+ *    Lihat `Deck.js` untuk implementasi penggabungan dek.
+ *
+ *  (fix versi sebelumnya tetap dipertahankan)
+ *  ✓ Pemain pertama dipilih secara acak
+ *  ✓ Tracking drewFromDiscard per pemain
+ *  ✓ Phase state machine yang lebih jelas
+ *  ✓ Nama pemain disertakan dalam snapshot
+ *  ✓ canCloseGame dipanggil dengan drewFromDiscard yang benar
+ *  ✓ snapshotPublic() menyertakan discardPileFull & discardCount
  */
 
 const { Deck }                               = require('../models/Deck');
@@ -25,17 +48,20 @@ const PHASES = {
   GAME_OVER: 'GAME_OVER'
 };
 
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 8;
+
 class GameState {
   /**
-   * @param {string[]} playerIds   — array ID pemain (2–4 orang)
+   * @param {string[]} playerIds   — array ID pemain (2–8 orang)
    * @param {object}   playerNames — map { id: nama } untuk tampilan
    * @param {object}   options
    *   @param {boolean} options.useJokers     — gunakan joker?
    *   @param {string}  options.mode          — 'traditional' | 'tournament'
    */
   constructor(playerIds, playerNames = {}, options = {}) {
-    if (playerIds.length < 2 || playerIds.length > 4) {
-      throw new Error('Remi Indonesia dimainkan oleh 2–4 pemain');
+    if (playerIds.length < MIN_PLAYERS || playerIds.length > MAX_PLAYERS) {
+      throw new Error(`Remi Indonesia dimainkan oleh ${MIN_PLAYERS}–${MAX_PLAYERS} pemain`);
     }
 
     this.useJokers = options.useJokers ?? false;
@@ -58,6 +84,14 @@ class GameState {
       drewFromDiscard: false
     }));
 
+    // NEW: jumlah dek 52-kartu yang digabung. >4 pemain butuh lebih banyak
+    // kartu daripada yang tersedia di 1 dek (52 kartu), jadi pakai 2 dek
+    // (104 kartu + 4 Joker jika diaktifkan).
+    this.deckCount = this.players.length > 4 ? 2 : 1;
+
+    // NEW: batas kedalaman pengambilan dari discard pile ("Makan Buangan").
+    this.maxEatDepth = this._computeMaxEatDepth(this.players.length);
+
     this.log    = [];
     this.scores = {};
     playerIds.forEach(id => { this.scores[id] = 0; });
@@ -67,8 +101,18 @@ class GameState {
   // Setup
   // ────────────────────────────────────────────────────
 
+  /**
+   * Hitung batas kedalaman "Makan Buangan" berdasarkan jumlah pemain.
+   *   - < 4 pemain  → tidak terbatas
+   *   - >= 4 pemain → 5 kartu teratas, +1 per pemain tambahan di atas 4
+   */
+  _computeMaxEatDepth(playerCount) {
+    if (playerCount < 4) return Infinity;
+    return 5 + (playerCount - 4);
+  }
+
   startRound() {
-    const deck = new Deck(this.useJokers);
+    const deck = new Deck(this.useJokers, this.deckCount);
     deck.shuffle();
 
     const hands = deck.deal(this.players.length, 7);
@@ -85,7 +129,7 @@ class GameState {
     this.currentTurnIdx = Math.floor(Math.random() * this.players.length);
     this.phase          = PHASES.DRAW;
 
-    this._log('SYSTEM', `Putaran ${this.round} dimulai. Giliran pertama: ${this.currentPlayer.name}`);
+    this._log('SYSTEM', `Putaran ${this.round} dimulai (${this.players.length} pemain, ${this.deckCount} dek). Giliran pertama: ${this.currentPlayer.name}`);
     return this.snapshotPublic();
   }
 
@@ -139,11 +183,15 @@ class GameState {
     const targetIdx  = discardLen - 1 - positionFromTop;
     const targetCard = this.discardPile[targetIdx];
 
+    // NEW: validateEat sekarang juga menerima this.maxEatDepth dan akan
+    // menolak posisi yang melebihi batas pengambilan buangan berdasarkan
+    // jumlah pemain di meja (lihat _computeMaxEatDepth()).
     const eatCheck = validateEat(
       targetCard,
       positionFromTop,
       player.hand,
-      player.hasBaseSeries
+      player.hasBaseSeries,
+      this.maxEatDepth
     );
 
     if (!eatCheck.allowed) {
@@ -233,6 +281,15 @@ class GameState {
     this._log(playerId, `Buang: ${card}`);
 
     this._nextTurn();
+
+    // FIX BUG #1: jika stock pile sudah kosong begitu giliran berikutnya
+    // dimulai, akhiri putaran SEKARANG — jangan menunggu pemain berikutnya
+    // mencoba draw_stock (yang bisa dihindari dengan memilih draw_discard
+    // sehingga game berjalan tanpa akhir).
+    if (this.stockPile.length === 0) {
+      return this._triggerStockEmpty();
+    }
+
     return { success: true, card, reason: 'OK' };
   }
 
@@ -269,8 +326,9 @@ class GameState {
   /**
    * Snapshot publik yang diperluas — dikirim ke semua pemain via state_update.
    *
-   * NEW: Menyertakan discardPileFull (seluruh tumpukan buangan, urutan bawah→atas)
-   *      dan discardCount untuk badge pada UI client.
+   * Menyertakan discardPileFull (seluruh tumpukan buangan, urutan bawah→atas)
+   * dan discardCount untuk badge pada UI client, serta `maxEatDepth` /
+   * `deckCount` agar client dapat menampilkan batas & konteks permainan.
    */
   snapshotPublic() {
     return {
@@ -282,9 +340,13 @@ class GameState {
       topDiscard:       this.topDiscard?.toString() ?? null,
       // Top 3 untuk preview preview (bottom-to-top order)
       discardPileTop3:  this.discardPile.slice(-3).map(c => c.toString()),
-      // Full discard pile (bottom-to-top order) — NEW for popup
+      // Full discard pile (bottom-to-top order) — untuk popup
       discardPileFull:  this.discardPile.map(c => c.toString()),
       discardCount:     this.discardPile.length,
+      // NEW: batas kedalaman "Makan Buangan" & jumlah dek yang dipakai
+      maxEatDepth:      this.maxEatDepth,
+      deckCount:        this.deckCount,
+      playerCount:      this.players.length,
       players: this.players.map(p => ({
         id:            p.id,
         name:          p.name,
@@ -353,6 +415,10 @@ class GameState {
   }
 
   _triggerStockEmpty() {
+    if (this.phase === PHASES.GAME_OVER) {
+      // Sudah berakhir sebelumnya — hindari double-ending.
+      return { success: false, reason: 'Permainan sudah selesai' };
+    }
     this._log('SYSTEM', 'Stock pile habis — permainan dihentikan otomatis');
     return this._endRound(null, null, true);
   }
@@ -394,10 +460,19 @@ class GameState {
     };
   }
 
+  /**
+   * Mulai putaran baru pada GameState yang sudah ada (mis. setelah round_over,
+   * host memilih "Main Lagi"). Mengembalikan snapshot publik dari putaran baru.
+   * Pemain & skor akumulasi (this.scores) dipertahankan; hanya kartu yang dikocok ulang.
+   */
+  startNextRound() {
+    return this.startRound();
+  }
+
   _log(actor, message) {
     this.log.push({ ts: Date.now(), actor, message });
     if (this.log.length > 500) this.log.shift();
   }
 }
 
-module.exports = { GameState, PHASES };
+module.exports = { GameState, PHASES, MIN_PLAYERS, MAX_PLAYERS };
