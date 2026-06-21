@@ -3,21 +3,29 @@
  * =====================================================
  * Mengelola siklus hidup "Ruang Permainan" (Room).
  *
- * PERBAIKAN:
- *  ✓ FIX: Reset ready semua pemain saat pemain baru bergabung
- *         (mencegah game mulai dengan 1 orang yang sudah "siap" dari sebelumnya)
- *  ✓ FIX: startGame() meneruskan map nama pemain ke GameState
- *  ✓ FIX: canStart tidak bisa true jika ada pemain yang belum siap (strict check)
- *  ✓ FIX: Lebih jelas tracking status koneksi saat game berlangsung
+ * UPDATE v3:
+ *  ✓ NEW: MAX_PLAYERS dinaikkan dari 4 → 8 (mendukung dek ganda di GameState/Deck)
+ *  ✓ NEW: options.maxPlayers dari client kini di-clamp ke [MIN_PLAYERS, MAX_PLAYERS]
+ *  ✓ NEW: startGame() bisa melanjutkan match yang sama (skor akumulasi tetap)
+ *         jika daftar pemain belum berubah sejak putaran sebelumnya — ini yang
+ *         membuat "game bisa mulai lagi" setelah round_over, bukan hanya berhenti.
+ *         Jika daftar pemain berubah (ada yang keluar/masuk), match baru dibuat
+ *         dan skor akumulasi di-reset.
+ *
+ * (fix versi sebelumnya tetap dipertahankan)
+ *  ✓ Reset ready semua pemain saat pemain baru bergabung
+ *  ✓ startGame() meneruskan map nama pemain ke GameState
+ *  ✓ canStart tidak bisa true jika ada pemain yang belum siap (strict check)
+ *  ✓ Lebih jelas tracking status koneksi saat game berlangsung
  */
 
-const { GameState } = require('../engine/GameState');
+const { GameState, MIN_PLAYERS: ENGINE_MIN_PLAYERS, MAX_PLAYERS: ENGINE_MAX_PLAYERS } = require('../engine/GameState');
 
 // Karakter InviteCode — hindari 0/O dan 1/I yang membingungkan
 const CODE_CHARS        = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH       = 5;
-const MAX_PLAYERS       = 4;
-const MIN_PLAYERS       = 2;
+const MAX_PLAYERS       = ENGINE_MAX_PLAYERS || 8; // mendukung 2-8 pemain (dek ganda otomatis di atas 4 pemain)
+const MIN_PLAYERS       = ENGINE_MIN_PLAYERS || 2;
 const ROOM_IDLE_TIMEOUT = 30 * 60 * 1000; // 30 menit → dihapus
 
 class Room {
@@ -28,7 +36,8 @@ class Room {
     this.options  = {
       useJokers:  options.useJokers  ?? false,
       mode:       options.mode       ?? 'traditional',
-      maxPlayers: options.maxPlayers ?? 4
+      // Clamp ke rentang yang didukung engine (2-8 pemain)
+      maxPlayers: Math.min(Math.max(Number(options.maxPlayers) || 4, MIN_PLAYERS), MAX_PLAYERS)
     };
     this.players      = [{ id: hostId, name: hostName, ready: false, connected: true, socketId: null }];
     this.game         = null;
@@ -43,7 +52,6 @@ class Room {
 
   /** 
    * canStart: cukup minimal pemain, semua sudah siap, dan masih di lobby.
-   * FIX: sebelumnya tidak cek apakah semua sudah siap (allReady).
    */
   get canStart() {
     return (
@@ -64,7 +72,7 @@ class Room {
       return { success: false, reason: 'Nama sudah digunakan pemain lain di ruang ini' };
     }
 
-    // FIX: Reset ready semua pemain saat ada pemain baru bergabung
+    // Reset ready semua pemain saat ada pemain baru bergabung
     // Ini mencegah skenario: 2 pemain siap → 1 keluar → 1 baru join → host langsung mulai
     this.players.forEach(p => { p.ready = false; });
 
@@ -81,7 +89,7 @@ class Room {
       this.hostId = this.players[0].id;
     }
 
-    // FIX: Reset ready semua pemain yang tersisa saat ada yang keluar
+    // Reset ready semua pemain yang tersisa saat ada yang keluar
     // Ini memastikan game tidak bisa dimulai tanpa konfirmasi ulang
     if (this.status === 'LOBBY') {
       this.players.forEach(p => { p.ready = false; });
@@ -103,8 +111,30 @@ class Room {
   }
 
   /**
-   * Mulai game: buat GameState dengan map nama pemain.
-   * FIX: teruskan playerNames ke GameState agar nama muncul di snapshot.
+   * Apakah daftar pemain (set of id) masih sama persis dengan saat
+   * `this.game` terakhir dibuat? Dipakai untuk menentukan apakah putaran
+   * baru bisa melanjutkan match yang sama (skor akumulasi) atau harus
+   * membuat GameState baru (skor reset).
+   */
+  _sameRosterAsGame() {
+    if (!this.game) return false;
+    const currentIds = this.players.map(p => p.id).sort();
+    const gameIds     = this.game.players.map(p => p.id).sort();
+    if (currentIds.length !== gameIds.length) return false;
+    return currentIds.every((id, i) => id === gameIds[i]);
+  }
+
+  /**
+   * Mulai (atau lanjutkan) permainan.
+   *
+   *  - Jika belum pernah ada game di room ini, ATAU daftar pemain sudah
+   *    berubah sejak putaran terakhir → buat GameState baru (skor reset).
+   *  - Jika game sebelumnya sudah GAME_OVER dan daftar pemain masih sama
+   *    persis → lanjutkan match yang sama dengan `startNextRound()`,
+   *    sehingga skor akumulasi (this.game.scores) tetap terbawa.
+   *
+   *  Ini yang memungkinkan "game bisa mulai lagi" setelah stock habis /
+   *  ada pemenang, alih-alih room menjadi permanen tidak bisa dipakai lagi.
    */
   startGame() {
     if (this.playerCount < MIN_PLAYERS) {
@@ -117,7 +147,15 @@ class Room {
       return { success: false, reason: 'Semua pemain harus siap sebelum memulai permainan' };
     }
 
-    // FIX: Buat map id → nama untuk diteruskan ke GameState
+    const canContinueMatch = this.game && this._sameRosterAsGame();
+
+    if (canContinueMatch) {
+      this.status = 'PLAYING';
+      this.touch();
+      return { success: true, snapshot: this.game.startNextRound(), continued: true };
+    }
+
+    // Match baru (pertama kali, atau roster berubah → skor reset)
     const playerIds   = this.players.map(p => p.id);
     const playerNames = {};
     this.players.forEach(p => { playerNames[p.id] = p.name; });
@@ -129,7 +167,19 @@ class Room {
     this.status = 'PLAYING';
     this.touch();
 
-    return { success: true, snapshot: this.game.startRound() };
+    return { success: true, snapshot: this.game.startRound(), continued: false };
+  }
+
+  /**
+   * Dipanggil saat sebuah putaran berakhir (round_over). Mengembalikan room
+   * ke status LOBBY dan mereset status "siap" semua pemain, sehingga host
+   * bisa memilih untuk memulai putaran baru (lanjut) atau membiarkan room
+   * berakhir begitu saja (pemain keluar satu-satu / room idle dihapus).
+   */
+  returnToLobbyAfterRound() {
+    this.status = 'LOBBY';
+    this.players.forEach(p => { p.ready = false; });
+    this.touch();
   }
 
   playerNameOf(playerId) {
