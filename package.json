@@ -1,0 +1,18 @@
+{
+  "name": "remi-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remi Indonesia multiplayer web game",
+  "main": "src/server/server.js",
+  "scripts": {
+    "start": "node src/server/server.js",
+    "test": "node test.js",
+    "serve-frontend": "npx serve public -l 3000"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
